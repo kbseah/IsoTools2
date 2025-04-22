@@ -143,7 +143,8 @@ def get_hmmer_sequences(transcriptome, genome_fn, aa_alphabet, query=True, ref_q
                 text_seq = pyhmmer.easel.TextSequence(sequence=seq, name=bytes(str(len(sequences)), 'utf-8'))
                 sequences.append(text_seq.digitize(aa_alphabet))
                 seq_ids.append(seqnames)
-    return sequences, seq_ids
+    sequences_block = pyhmmer.easel.DigitalSequenceBlock(alphabet=sequences[0].alphabet, iterable=sequences)
+    return sequences_block, seq_ids
 
 #  function of isoseq.Transcriptome
 
