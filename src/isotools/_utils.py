@@ -276,7 +276,10 @@ def find_orfs(sequence, start_codons=None, stop_codons=None, ref_cds=None):
 
 
 def has_overlap(r1, r2):
-    "check the overlap of two intervals"
+    """check the overlap of two intervals
+
+    Does not distinguish between (start,end) or (end,start) order in coordinates
+    """
     # Interval objects have lengths >=2, first two elements are coordinates
     assert len(r1) >= 2, f"Should be length >=2, instead saw: {str(r1)}"
     assert len(r2) >= 2, f"Should be length >=2, instead saw: {str(r2)}"
@@ -287,7 +290,10 @@ def has_overlap(r1, r2):
 
 
 def get_overlap(r1, r2):
-    "check the overlap of two intervals"
+    """get the overlap length of two intervals
+
+    Does not distinguish between (start,end) or (end,start) order in coordinates
+    """
     # Flip coordinates if given as (end, start)
     r1_start, r1_end = (r1[0], r1[1]) if r1[0] < r1[1] else (r1[1], r1[0])
     r2_start, r2_end = (r2[0], r2[1]) if r2[0] < r2[1] else (r2[1], r2[0])
