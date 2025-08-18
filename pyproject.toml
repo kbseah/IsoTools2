@@ -45,6 +45,9 @@ Repository = "https://github.com/HerwigLab/IsoTools2.git"
 Issues = "https://github.com/HerwigLab/IsoTools2/issues"
 Changelog = "https://github.com/HerwigLab/IsoTools2/blob/master/CHANGELOG.md"
 
+[project.scripts]
+run_isotools = "isotools.run_isotools:main"
+
 [tool.setuptools.dynamic]
 version = {file = ["VERSION.txt"]}
 
