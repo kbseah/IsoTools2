@@ -1129,7 +1129,7 @@ def plot_domains(
         ]
         # Filter hmmer domain hits by P-value if max P-value is specified
         if hmmer_maxpval is not None and source == "hmmer":
-            domains = [dom for dom in domains if float(dom[5]) < float(hmmer_maxpval)]
+            domains = [dom for dom in domains if float(dom[6]) < float(hmmer_maxpval)]
         # sort by length
         domains.sort(key=lambda x: x[3][1] - x[3][0], reverse=True)
         # get positions relative to segments
