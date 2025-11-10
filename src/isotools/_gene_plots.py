@@ -1217,3 +1217,122 @@ def plot_domains(
         ],
     )
     return ax, genome_map
+
+
+def domains_figure(
+    self,
+    groups: dict,
+    source="hmmer",
+    query="FSM or SUBSTANTIAL",
+    transcript_ids=False,
+    ref_transcript_ids=False,
+    height_factor=0.75,
+    **kwargs,
+):
+    """Generate figure of domains alongside scatterplot of coverage per group
+
+    The domains plot will be plotted alongside a scatterplot where size of plot elements
+    is proportional to the reads coverage of the given transcript per sample. SQANTI
+    categories of each transcript is also indicated.
+
+    :param groups: Transcriptome's dict of groups
+    :param source: Source of protein domains, e.g. "annotation", "hmmer" or "interpro", for domains added by the functions
+        "add_annotation_domains", "add_hmmer_domains" or "add_interpro_domains" respectively.
+    :param query: Query to filter transcripts by TAGs
+    :param transcript_ids: List of transcript IDs; if False, defer to the query
+    :param ref_transcript_ids: List of reference transcript ids to plot; if False, reference transcripts are not plotted.
+    :param height_factor: Adjustment factor for figure height.
+    :param **kwargs: Other parameters passed to plot_domains
+    """
+    if transcript_ids:
+        if type(transcript_ids) == list:
+            trids = transcript_ids
+        else:
+            trids = list(range(self.n_transcripts))
+    else:
+        trids = self.filter_transcripts(query)
+    if ref_transcript_ids:
+        if type(ref_transcript_ids) == list:
+            n_ref_transcripts = len(ref_transcript_ids)
+        else:
+            n_ref_transcripts = self.n_ref_transcripts
+    else:
+        n_ref_transcripts = 0
+    if len(trids) == 0:
+        raise ValueError("Empty set after query filter")
+    fig_height = height_factor * (len(trids) + n_ref_transcripts)
+    fig, axs = plt.subplots(
+        1,
+        2,
+        figsize=(10, fig_height),
+        sharey=True,
+        gridspec_kw=dict(width_ratios=[5, 2]),
+    )
+    # Plot domains
+    self.plot_domains(
+        source=source,
+        ref_transcript_ids=ref_transcript_ids,
+        transcript_ids=trids,
+        label="name",
+        include_utr=True,
+        coding_only=False,
+        separate_exons=True,
+        ax=axs[0],
+        **kwargs,
+    )
+    axs[0].set_title("domains")
+    # Coverage per isoform per group, as scatter plot blobs
+    # transpose: rows represent transcripts
+    arr = np.array(
+        [
+            self.get_infos(trid, ["group_coverage_sum"], None, range(len(groups)))
+            for trid in trids
+        ]
+    )
+    # if reference transcripts, add blanks
+    if ref_transcript_ids:
+        ngroup = arr.shape[1]
+        arr = np.concatenate(
+            [
+                np.zeros([n_ref_transcripts, ngroup], dtype=int),
+                arr,
+            ]
+        )
+    yy = []
+    xx = []
+    ss = []
+    cc = []
+    for row in range(len(arr)):
+        for col in range(len(arr[row])):
+            yy.append(0 - row)  # from top to bottom
+            xx.append(col)
+            ss.append(10 * arr[row, col] ** 0.5)
+            cc.append("grey")
+            # cc.append(arr[row,col])
+    axs[1].scatter(x=xx, y=yy, s=ss, c=cc, linewidths=0)
+    axs[1].set_xlim(min(xx) - 1, max(xx) + 1)
+    axs[1].set_title("coverage")
+    axs[1].set_xticks(ticks=range(len(groups)), labels=list(groups.keys()))
+    # label with SQANTI categories of each transcript
+    annot2cat = {
+        0: "FSM",
+        1: "ISM",
+        2: "NIC",
+        3: "NNC",
+        4: "NOVEL",
+    }
+    categories = []
+    if ref_transcript_ids:
+        if type(ref_transcript_ids) == list:
+            categories.extend(["REF" for i in ref_transcript_ids])
+        else:
+            categories.extend(["REF"] * self.n_ref_transcripts)
+    categories.extend([annot2cat[self.transcripts[i]["annotation"][0]] for i in trids])
+    axs_twinx = axs[1].twinx()
+    axs_twinx.set_ylim(axs[1].get_ylim())
+    axs_twinx.set_yticks(
+        ticks=axs[1].get_yticks(),
+        labels=categories,
+    )
+    fig.tight_layout()
+    return (fig, axs)

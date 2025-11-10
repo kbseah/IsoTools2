@@ -142,6 +142,7 @@ class Gene(Interval):
         sashimi_plot_short_reads,
         sashimi_figure,
         plot_domains,
+        domains_figure,
     )
     from .domains import add_interpro_domains
 
