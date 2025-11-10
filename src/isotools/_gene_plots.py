@@ -1000,7 +1000,7 @@ def plot_domains(
         If set to "genome", positions are (discontinous) genomic coordinates.
     :param dom_space: relative space used for the domains. Should be between 0 and 1.
     :param ax: Specify the axis.
-    :param domain_cols: Dicionary for the colors of different domain types.
+    :param domain_cols: Dictionary for the colors of different domain types.
     :param max_overlap: Maximum number of overlapping domains to be depicted. Longer domains have priority over shorter domains.
     :param highlight: List of genomic positions or intervals to highlight.
     :param highlight_col: Specify the color for highlight positions.
