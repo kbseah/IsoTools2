@@ -1004,7 +1004,8 @@ def plot_domains(
     :param max_overlap: Maximum number of overlapping domains to be depicted. Longer domains have priority over shorter domains.
     :param highlight: List of genomic positions or intervals to highlight.
     :param highlight_col: Specify the color for highlight positions.
-    :param hmmer_maxpval: Maximum p-value for hmmer domain annotations; source must be 'hmmer'."""
+    :param hmmer_maxpval: Maximum p-value for hmmer domain annotations; source must be 'hmmer'.
+    """
 
     if label is not None:
         assert label in (
@@ -1127,12 +1128,8 @@ def plot_domains(
             if categories is None or dom[2] in categories
         ]
         # Filter hmmer domain hits by P-value if max P-value is specified
-        if hmmer_maxpval is not None and source=='hmmer':
-            domains = [
-                dom
-                for dom in domains
-                if float(dom[5]) < float(hmmer_maxpval)
-            ]
+        if hmmer_maxpval is not None and source == "hmmer":
+            domains = [dom for dom in domains if float(dom[5]) < float(hmmer_maxpval)]
         # sort by length
         domains.sort(key=lambda x: x[3][1] - x[3][0], reverse=True)
         # get positions relative to segments
