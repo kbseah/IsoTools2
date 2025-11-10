@@ -993,7 +993,7 @@ def plot_domains(
     :param transcript_ids: List of transcript indices to be depicted. If True/False, all/none transcripts are depicted.
     :param ref_transcript_ids: List of reference transcript indices to be depicted. If True/False, all/none reference transcripts are depicted.
     :param coding_only: Depict only transcripts with annotated ORF/CDS (requires include_utr=True)
-    :param label: Specify the type of label: eiter None, or id, or name.
+    :param label: Specify the type of label: either None, or id, or name.
     :param include_utr: If set True, the untranslated regions are also depicted.
     :param separate_exons: If set True, exon boundaries are marked.
     :param x_ticks: Either "gene" or "genome". If set to "gene", positions are relative to the gene (continuous, starting from 0).
