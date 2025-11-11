@@ -1314,6 +1314,7 @@ def domains_figure(
     source="hmmer",
     query="FSM or SUBSTANTIAL",
     transcript_ids=False,
+    cov_color="grey",
     ref_transcript_ids=False,
     height_factor=0.75,
     **kwargs,
@@ -1330,6 +1331,7 @@ def domains_figure(
     :param query: Query to filter transcripts by TAGs
     :param transcript_ids: List of transcript IDs; if False, defer to the query
     :param ref_transcript_ids: List of reference transcript ids to plot; if False, reference transcripts are not plotted.
+    :param cov_color: Either a color name string, or a list of color name strings for the coverage plot elements (of same length as the list of transcript_ids)
     :param height_factor: Adjustment factor for figure height.
     :param **kwargs: Other parameters passed to plot_domains
     """
@@ -1396,8 +1398,15 @@ def domains_figure(
             yy.append(0 - row)  # from top to bottom
             xx.append(col)
             ss.append(10 * arr[row, col] ** 0.5)
-            cc.append("grey")
+            # cc.append("grey")
             # cc.append(arr[row,col])
+    if isinstance(cov_color, str):
+        cc = [cov_color] * len(yy)
+    elif isinstance(cov_color, list) and len(cov_color) == len(yy):
+        assert all([isinstance(j, str) for j in cov_color]), "cov_color must be a list of color name strings"
+        cc = cov_color
+    else:
+        cc = ['grey'] * len(yy)
     axs[1].scatter(x=xx, y=yy, s=ss, c=cc, linewidths=0)
     axs[1].set_xlim(min(xx) - 1, max(xx) + 1)
     axs[1].set_title("coverage")
