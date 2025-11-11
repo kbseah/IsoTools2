@@ -1449,12 +1449,45 @@ def domains_figure(
 def domains_figure_altsplice_result(
     self,
     groups: dict,
+    diff_splice_result,
     source="hmmer",
     query="FSM or SUBSTANTIAL",
     transcript_ids=False,
-    cov_color="grey",
     ref_transcript_ids=False,
     height_factor=0.75,
     **kwargs,
 ):
-    pass
+    """Generate figure of domains alongside coverage scatterplot, contrasting transcripts involved in AS event
+
+    Refer to isotools.Gene.domains_figure documentation for details
+
+    :param groups: Transcriptome's dict of groups
+    :param source: Source of protein domains, e.g. "annotation", "hmmer" or "interpro", for domains added by the functions
+        "add_annotation_domains", "add_hmmer_domains" or "add_interpro_domains" respectively.
+    :param query: Query to filter transcripts by TAGs
+    :param transcript_ids: List of transcript IDs; if False, defer to the query
+    :param ref_transcript_ids: List of reference transcript ids to plot; if False, reference transcripts are not plotted.
+    :param height_factor: Adjustment factor for figure height.
+    :param **kwargs: Other parameters passed to plot_domains
+    """
+    setA = list(
+        set(self.filter_transcripts(query)).intersection(diff_splice_result.trA)
+    )
+    setB = list(
+        set(self.filter_transcripts(query)).intersection(diff_splice_result.trB)
+    )
+    if len(setA) == 0 or len(setB) == 0:
+        raise ValueError("Empty set after query filter")
+    cov_color = ["darkblue"] * len(setA) + ["darkred"] * len(setB)
+    fig, axs = self.domains_figure(
+        groups=groups,
+        source=source,
+        query=query,
+        transcript_ids=setA + setB,
+        cov_color=cov_color,
+        highlight=[diff_splice_result.start, diff_splice_result.end],
+        ref_transcript_ids=ref_transcript_ids,
+        height_factor=height_factor,
+        **kwargs,
+    )
+    return fig, axs
