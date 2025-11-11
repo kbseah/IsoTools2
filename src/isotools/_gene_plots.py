@@ -1410,7 +1410,6 @@ def domains_figure(
                 cc.append(cov_color)
             elif isinstance(cov_color, list):
                 cc.append(cov_color[row - n_ref_transcripts])
-
     axs[1].scatter(x=xx, y=yy, s=ss, c=cc, linewidths=0)
     axs[1].set_xlim(min(xx) - 1, max(xx) + 1)
     axs[1].set_title("coverage")
