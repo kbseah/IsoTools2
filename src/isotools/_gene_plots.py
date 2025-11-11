@@ -1403,10 +1403,12 @@ def domains_figure(
     if isinstance(cov_color, str):
         cc = [cov_color] * len(yy)
     elif isinstance(cov_color, list) and len(cov_color) == len(yy):
-        assert all([isinstance(j, str) for j in cov_color]), "cov_color must be a list of color name strings"
+        assert all(
+            [isinstance(j, str) for j in cov_color]
+        ), "cov_color must be a list of color name strings"
         cc = cov_color
     else:
-        cc = ['grey'] * len(yy)
+        cc = ["grey"] * len(yy)
     axs[1].scatter(x=xx, y=yy, s=ss, c=cc, linewidths=0)
     axs[1].set_xlim(min(xx) - 1, max(xx) + 1)
     axs[1].set_title("coverage")
