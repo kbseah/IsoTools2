@@ -1334,14 +1334,14 @@ def domains_figure(
     :param **kwargs: Other parameters passed to plot_domains
     """
     if transcript_ids:
-        if type(transcript_ids) == list:
+        if isinstance(transcript_ids, list):
             trids = transcript_ids
         else:
             trids = list(range(self.n_transcripts))
     else:
         trids = self.filter_transcripts(query)
     if ref_transcript_ids:
-        if type(ref_transcript_ids) == list:
+        if isinstance(ref_transcript_ids, list):
             n_ref_transcripts = len(ref_transcript_ids)
         else:
             n_ref_transcripts = self.n_ref_transcripts
@@ -1412,7 +1412,7 @@ def domains_figure(
     }
     categories = []
     if ref_transcript_ids:
-        if type(ref_transcript_ids) == list:
+        if isinstance(ref_transcript_ids, list):
             categories.extend(["REF" for i in ref_transcript_ids])
         else:
             categories.extend(["REF"] * self.n_ref_transcripts)
