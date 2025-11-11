@@ -1351,6 +1351,11 @@ def domains_figure(
         n_ref_transcripts = 0
     if len(trids) == 0:
         raise ValueError("Empty set after query filter")
+    # Check if color array is correct length and type
+    if isinstance(cov_color, list):
+        assert len(cov_color) == len(trids), "cov_color must be same length as number of transcripts to plot"
+        assert all([isinstance(j, str) for j in cov_color]), "cov_color must be a list of color name strings"
+    # Plot parameters
     fig_height = height_factor * (len(trids) + n_ref_transcripts)
     fig, axs = plt.subplots(
         1,
@@ -1380,7 +1385,10 @@ def domains_figure(
             for trid in trids
         ]
     )
+    # Initialize array for color strings
+    cc = []
     # if reference transcripts, add blanks
+    # ref transcripts precede observed
     if ref_transcript_ids:
         ngroup = arr.shape[1]
         arr = np.concatenate(
@@ -1389,24 +1397,20 @@ def domains_figure(
                 arr,
             ]
         )
+
     yy = []
     xx = []
     ss = []
-    cc = []
     for row in range(len(arr)):
         for col in range(len(arr[row])):
             yy.append(0 - row)  # from top to bottom
             xx.append(col)
             ss.append(10 * arr[row, col] ** 0.5)
-            # cc.append("grey")
-            # cc.append(arr[row,col])
-    if isinstance(cov_color, str):
-        cc = [cov_color] * len(yy)
-    elif isinstance(cov_color, list) and len(cov_color) == len(yy):
-        assert all([isinstance(j, str) for j in cov_color]), "cov_color must be a list of color name strings"
-        cc = cov_color
-    else:
-        cc = ['grey'] * len(yy)
+            if isinstance(cov_color, str):
+                cc.append(cov_color)
+            elif isinstance(cov_color, list):
+                cc.append(cov_color[row - n_ref_transcripts])
+
     axs[1].scatter(x=xx, y=yy, s=ss, c=cc, linewidths=0)
     axs[1].set_xlim(min(xx) - 1, max(xx) + 1)
     axs[1].set_title("coverage")
@@ -1434,3 +1438,16 @@ def domains_figure(
     )
     fig.tight_layout()
     return (fig, axs)
+
+def domains_figure_altsplice_result(
+    self,
+    groups: dict,
+    source="hmmer",
+    query="FSM or SUBSTANTIAL",
+    transcript_ids=False,
+    cov_color="grey",
+    ref_transcript_ids=False,
+    height_factor=0.75,
+    **kwargs,
+):
+    pass
