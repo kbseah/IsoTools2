@@ -141,6 +141,7 @@ class Gene(Interval):
         gene_track,
         sashimi_plot_short_reads,
         sashimi_figure,
+        sashimi_figure_altsplice_result,
         plot_domains,
         domains_figure,
     )
