@@ -1316,6 +1316,7 @@ def domains_figure(
     transcript_ids=False,
     cov_color="grey",
     ref_transcript_ids=False,
+    highlight=None,
     height_factor=0.75,
     **kwargs,
 ):
@@ -1331,6 +1332,7 @@ def domains_figure(
     :param query: Query to filter transcripts by TAGs
     :param transcript_ids: List of transcript IDs; if False, defer to the query
     :param ref_transcript_ids: List of reference transcript ids to plot; if False, reference transcripts are not plotted.
+    :param highlight: Coordinates to highlight, passed to plot_domains
     :param cov_color: Either a color name string, or a list of color name strings for the coverage plot elements (of same length as the list of transcript_ids)
     :param height_factor: Adjustment factor for figure height.
     :param **kwargs: Other parameters passed to plot_domains
@@ -1377,6 +1379,7 @@ def domains_figure(
         include_utr=True,
         coding_only=False,
         separate_exons=True,
+        highlight=highlight,
         ax=axs[0],
         **kwargs,
     )
