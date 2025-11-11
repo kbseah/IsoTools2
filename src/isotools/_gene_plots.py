@@ -966,6 +966,95 @@ def genome_pos_to_gene_segments(pos, genome_map, strict=True):
     return {p: mp for p, mp in zip(pos, mapped_pos)}
 
 
+def sashimi_figure_altsplice_result(
+    self,
+    groups: dict,
+    diff_splice_result,
+    flank=2000,
+    start=None,
+    end=None,
+    query="(FSM or not (RTTS or INTERNAL_PRIMING or FRAGMENT)) and SUBSTANTIAL",
+):
+    """Sashimi plot and gene tracks figure for isoforms involved in a single alternative splicing event
+
+    :param groups: Dict of groups to samples
+    :param diff_splice_result: Single AS result from the differential splicing analysis results table, either as tuple generated from .itertuples() method or as pandas Series
+    :param flank: Number of bp flanking start and end coordinates of AS event to plot
+    :param start,end: Override default start, end coordinates; if specified, 'flank' parameter is ignored
+    :param query: Query to filter transcripts by isotools quality tags
+    """
+    if start is None:
+        start = diff_splice_result.start - flank
+    if end is None:
+        end = diff_splice_result.end + flank
+    pos = [start, end]
+
+    # Get transcript IDs for transcripts supporting the alternative splice forms
+    # and reference transcripts
+    transcripts_A = list(
+        set(self.filter_transcripts(query=query)).intersection(
+            set(diff_splice_result.trA)
+        )
+    )
+    transcripts_B = list(
+        set(self.filter_transcripts(query=query)).intersection(
+            set(diff_splice_result.trB)
+        )
+    )
+    transcripts_C = self.ref_transcripts
+
+    # Scale plot according to number of gene tracks to plot
+    height_ratios = (
+        [0.2 + 0.3 * len(transcripts_A), 0.2 + 0.3 * len(transcripts_B)]
+        + [0.2 + 0.3 * len(transcripts_C)]
+        + [1.5] * len(groups)
+    )
+    fig_height = sum(height_ratios)
+    fig_width = 10
+    gs_kw = dict(height_ratios=height_ratios)
+    fig, axs = plt.subplots(
+        len(height_ratios), figsize=(fig_width, fig_height), gridspec_kw=gs_kw
+    )
+
+    # Add gene tracks for transcripts
+    self.gene_track(
+        x_range=pos, ax=axs[0], reference=False, select_transcripts=transcripts_A
+    )
+    self.gene_track(
+        x_range=pos, ax=axs[1], reference=False, select_transcripts=transcripts_B
+    )
+    self.gene_track(
+        x_range=pos,
+        ax=axs[2],
+        reference=True,
+    )
+    axs[3].annotate(diff_splice_result.splice_type, xy=(0, 1), xycoords="axes fraction")
+    ax_idx = 3
+
+    # Add sashimi plot zoomed in on AS event
+    for group in groups:
+        self.sashimi_plot(
+            samples=groups[group],
+            x_range=pos,
+            ax=axs[ax_idx],
+            title=group,
+            log_y=False,
+        )
+        # Underline to highlight regions with differential splicing
+        # Color red if p_adj < 0.05
+        if diff_splice_result is not None:
+            axs[ax_idx].vlines(
+                x=[diff_splice_result.start, diff_splice_result.end],
+                ymin=-10000,
+                ymax=10000,
+                color="red",
+            )
+        ax_idx += 1
+
+    fig.tight_layout()
+    return (fig, axs)
+
+
 def plot_domains(
     self,
     source,
