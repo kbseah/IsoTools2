@@ -1462,6 +1462,7 @@ def domains_figure_altsplice_result(
     Refer to isotools.Gene.domains_figure documentation for details
 
     :param groups: Transcriptome's dict of groups
+    :param diff_splice_result: Single AS result from the differential splicing analysis results table, either as tuple generated from .itertuples() method or as pandas Series
     :param source: Source of protein domains, e.g. "annotation", "hmmer" or "interpro", for domains added by the functions
         "add_annotation_domains", "add_hmmer_domains" or "add_interpro_domains" respectively.
     :param query: Query to filter transcripts by TAGs
