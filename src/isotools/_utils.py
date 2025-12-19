@@ -217,8 +217,13 @@ def splice_identical(exon_list1, exon_list2, strictness=math.inf):
 
 
 def kozak_score(sequence, pos, pwm=DEFAULT_KOZAK_PWM):
+    """Return Kozak score given sequence and weights matrix
+
+    Assumes nucleotide symbols used as keys for the weight matrix are in upper
+    case; input sequence string will be uppercased before lookup.
+    """
     return sum(
-        pwm.loc[sequence[pos + i], i]
+        pwm.loc[sequence.upper()[pos + i], i]
         for i in pwm.columns
         if pos + i >= 0 and pos + i < len(sequence)
     )
