@@ -983,6 +983,7 @@ def plot_domains(
     max_overlap=5,
     highlight=None,
     highlight_col="red",
+    hmmer_maxpval=None,
 ):
     """Plot exonic part of transcripts, together with protein domains and annotations.
 
@@ -992,17 +993,19 @@ def plot_domains(
     :param transcript_ids: List of transcript indices to be depicted. If True/False, all/none transcripts are depicted.
     :param ref_transcript_ids: List of reference transcript indices to be depicted. If True/False, all/none reference transcripts are depicted.
     :param coding_only: Depict only transcripts with annotated ORF/CDS (requires include_utr=True)
-    :param label: Specify the type of label: eiter None, or id, or name.
+    :param label: Specify the type of label: either None, or id, or name.
     :param include_utr: If set True, the untranslated regions are also depicted.
     :param separate_exons: If set True, exon boundaries are marked.
     :param x_ticks: Either "gene" or "genome". If set to "gene", positions are relative to the gene (continuous, starting from 0).
         If set to "genome", positions are (discontinous) genomic coordinates.
     :param dom_space: relative space used for the domains. Should be between 0 and 1.
     :param ax: Specify the axis.
-    :param domain_cols: Dicionary for the colors of different domain types.
+    :param domain_cols: Dictionary for the colors of different domain types.
     :param max_overlap: Maximum number of overlapping domains to be depicted. Longer domains have priority over shorter domains.
     :param highlight: List of genomic positions or intervals to highlight.
-    :param highlight_col: Specify the color for highlight positions."""
+    :param highlight_col: Specify the color for highlight positions.
+    :param hmmer_maxpval: Maximum p-value for hmmer domain annotations; source must be 'hmmer'.
+    """
 
     if label is not None:
         assert label in (
@@ -1124,6 +1127,9 @@ def plot_domains(
             for dom in transcript.get("domain", {}).get(source, [])
             if categories is None or dom[2] in categories
         ]
+        # Filter hmmer domain hits by P-value if max P-value is specified
+        if hmmer_maxpval is not None and source == "hmmer":
+            domains = [dom for dom in domains if float(dom[6]) < float(hmmer_maxpval)]
         # sort by length
         domains.sort(key=lambda x: x[3][1] - x[3][0], reverse=True)
         # get positions relative to segments
