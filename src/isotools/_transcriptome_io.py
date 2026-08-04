@@ -8,7 +8,7 @@ from intervaltree import IntervalTree, Interval
 from Bio.Seq import reverse_complement
 from collections.abc import Iterable
 from collections import Counter, defaultdict
-from pysam import TabixFile, AlignmentFile, FastaFile
+from pysam import AlignmentFile, FastaFile
 from tqdm import tqdm
 from contextlib import ExitStack
 from .short_read import Coverage
@@ -164,9 +164,10 @@ def add_sample_from_csv(
     :param sample_properties: Additional properties of the samples, that get added to the sample table, and can be used to group or stratify the samples.
         Can be provided either as a dict with sample names as keys, and the respective properties dicts as the values,
         or as a data frame with a column "name" or with the sample names in the index, and the properties in the additional columns.
+        Use "group" for grouping information.
     :param add_chromosomes: If True, genes from chromosomes which are not in the Transcriptome yet are added.
     :param infer_genes: If True, gene structure is inferred from the transcripts. Useful for gtf files without gene information.
-    :param reconstruct_genes: If True, transcript gene assignment from gtf is ignored, and transcripts are grouped to genes from scratch.
+    :param reconstruct_genes: If True, transcript to gene assignment from gtf is ignored, and transcripts are grouped to genes from scratch.
     :param min_exonic_ref_coverage: Minimal fraction of exonic overlap to assign to reference transcript if no splice junctions match.
         Also applies to mono-exonic transcripts
     :param progress_bar: Show the progress.
@@ -1595,8 +1596,17 @@ def _read_gtf_file(file_name, chromosomes, infer_genes=False, progress_bar=True)
     #       pbar.update(file_pos-pbar.n)
     openfun = gziplib.open if file_name.endswith(".gz") else open
 
+    # two-pass approach: count lines first for a proper growing bar, then iterate
+    if progress_bar:
+        with openfun(file_name, "rt") as gtf:
+            total_lines = sum(1 for _ in gtf)
+    else:
+        total_lines = None
+
     with openfun(file_name, "rt") as gtf:
-        for line in gtf:
+        for line in tqdm(
+            gtf, total=total_lines, disable=not progress_bar, unit="lines"
+        ):
             if line[0] == "#":  # ignore header lines
                 continue
             ls = line.split(sep="\t")
@@ -1742,45 +1752,40 @@ def _read_gtf_file(file_name, chromosomes, infer_genes=False, progress_bar=True)
     return exons, transcripts, gene_infos, cds_start, cds_stop, skipped
 
 
-def _get_tabix_end(tbx_fh):
-    for _line in tbx_fh.fetch(tbx_fh.contigs[-1]):
-        pass
-    end = tbx_fh.tell()
-    tbx_fh.seek(0)
-    return end
-
-
-def _read_gff_file(file_name, chromosomes, progress_bar=True):
+def _read_gff_file(file_name, chromosomes, infer_genes=False, progress_bar=True):
     exons = dict()  # transcript id -> exons
     transcripts = dict()  # gene_id -> transcripts
     skipped = defaultdict(set)
     genes = dict()
     cds_start = dict()
     cds_stop = dict()
-    # takes quite some time... add a progress bar?
-    with (
-        tqdm(
-            total=path.getsize(file_name),
-            unit_scale=True,
-            unit="B",
-            unit_divisor=1024,
-            disable=not progress_bar,
-        ) as pbar,
-        TabixFile(file_name) as gff,
-    ):
-        chrom_ids = get_gff_chrom_dict(gff, chromosomes)
-        for line in gff.fetch():
-            file_pos = (
-                gff.tell() >> 16
-            )  # the lower 16 bit are the position within the zipped block
-            if pbar.n < file_pos:
-                pbar.update(file_pos - pbar.n)
-            ls = line.split(sep="\t")
-            if ls[0] not in chrom_ids:
+
+    openfun = gziplib.open if file_name.endswith(".gz") else open
+
+    if progress_bar:
+        with openfun(file_name, "rt") as gff:
+            total_lines = sum(1 for _ in gff)
+    else:
+        total_lines = None
+
+    with openfun(file_name, "rt") as gff:
+        for line in tqdm(
+            gff, total=total_lines, disable=not progress_bar, unit="lines"
+        ):
+            if line[0] == "#":  # ignore header lines
                 continue
-            chrom = chrom_ids[ls[0]]
+
+            # unlike pysam TabixFile.fetch(), plain file iteration keeps the
+            # trailing newline, which would otherwise leak into the last
+            # (attributes) field
+            ls = line.rstrip("\n").split(sep="\t")
+            if len(ls) < 9:
+                logger.warning("GFF line has fewer than 9 fields, skipping:\n%s", line)
+                continue
+
+            chrom = ls[0]
             if chromosomes is not None and chrom not in chromosomes:
-                logger.debug("skipping line %s from chr %s", line, chrom)
+                logger.debug("skipping line from chr " + chrom)
                 continue
             try:
                 info = dict(
@@ -1791,8 +1796,11 @@ def _read_gff_file(file_name, chromosomes, progress_bar=True):
                     "GFF format error in infos (should be ; separated key=value pairs). Skipping line:\n%s",
                     line,
                 )
+                continue
+
             start, end = [int(i) for i in ls[3:5]]
             start -= 1  # to make 0 based
+
             if ls[2] == "exon":
                 try:
                     gff_id = info["Parent"]
@@ -1820,6 +1828,33 @@ def _read_gff_file(file_name, chromosomes, progress_bar=True):
             ):  # those denote transcripts
                 tr_info = {k: v for k, v in info.items() if k.startswith("transcript_")}
                 transcripts.setdefault(info["Parent"], {})[info["ID"]] = tr_info
+                if infer_genes:
+                    # the transcript's Parent is the gene id -- unlike an exon's
+                    # Parent, which is the transcript id one level down
+                    gene_id = info["Parent"]
+                    if gene_id not in genes.get(chrom, {}):  # gene not seen yet
+                        gene_data = {"ID": gene_id, "chr": chrom, "strand": ls[6]}
+                        if (
+                            "gene_name" in info
+                        ):  # "Name" here is the transcript's own name
+                            gene_data["name"] = info["gene_name"]
+                        gene_data["properties"] = {
+                            k: v
+                            for k, v in info.items()
+                            if not k.startswith("transcript_")
+                        }
+                        genes.setdefault(chrom, {})[gene_id] = (
+                            gene_data,
+                            start,
+                            end,
+                        )  # start/end not fixed yet
+                    else:
+                        known_info = genes[chrom][gene_id]
+                        genes[chrom][gene_id] = (
+                            known_info[0],
+                            min(known_info[1], start),
+                            max(known_info[2], end),
+                        )
             elif ls[2] == "start_codon" and "Parent" in info:
                 cds_start[info["Parent"]] = end if ls[6] == "-" else start
             elif ls[2] == "stop_codon" and "Parent" in info:
@@ -1828,6 +1863,7 @@ def _read_gff_file(file_name, chromosomes, progress_bar=True):
                 # skip other feature types. Only keep a record of feature type without further information in skipped
                 # this usually happens to reference annotation, eg: UTR, CDS etc.
                 skipped[ls[2]]
+
     return exons, transcripts, genes, cds_start, cds_stop, skipped
 
 
@@ -1910,16 +1946,28 @@ def import_ref_transcripts(
                         if cds_start[transcript_id] < cds_stop[transcript_id]
                         else (cds_stop[transcript_id], cds_start[transcript_id])
                     )
-                gene.data["reference"].setdefault("transcripts", []).append(
-                    transcript_info
-                )
+                if (
+                    "transcripts" in gene.data["reference"]
+                    and type(gene.data["reference"]["transcripts"]) is not list
+                ):
+                    logger.warning(
+                        f"ignore gene {gene_id} as no proper annotation found"
+                    )
+                    logger.debug(
+                        f'its "transcripts" field is: {gene.data["reference"]["transcripts"]}'
+                    )
+                else:
+                    gene.data["reference"].setdefault("transcripts", []).append(
+                        transcript_info
+                    )
             if short_exon_th is not None:
-                short_exons = {
-                    exon
-                    for transcript in gene.data["reference"]["transcripts"]
-                    for exon in transcript["exons"]
-                    if exon[1] - exon[0] <= short_exon_th
-                }
+                short_exons = set()
+                for transcript in gene.data["reference"]["transcripts"]:
+                    if isinstance(transcript, dict):
+                        for exon in transcript["exons"]:
+                            exon_length = exon[1] - exon[0]
+                            if exon_length <= short_exon_th:
+                                short_exons.add(exon)
                 if short_exons:
                     gene.data["reference"]["short_exons"] = short_exons
     return genes
@@ -2927,30 +2975,6 @@ def _mats_alt_splice_export(
                 + [pos for exon in exons for pos in exon]
             )  # no need to reverse the order of exon start/end
     return [[offset + count] + l for count, l in enumerate(lines)]
-
-
-def get_gff_chrom_dict(gff: TabixFile, chromosomes):
-    "fetch chromosome ids - in case they use ids in gff for the chromosomes"
-    chrom = {}
-    for c in gff.contigs:
-        # loggin.debug ("---"+c)
-        for line in gff.fetch(
-            c, 1, 2
-        ):  # chromosomes span the entire chromosome, so they can be fetched like that
-            if line[1] == "C":
-                ls = line.split(sep="\t")
-                if ls[2] == "region":
-                    info = dict([pair.split("=") for pair in ls[8].split(";")])
-                    if "chromosome" in info.keys():
-                        if chromosomes is None or info["chromosome"] in chromosomes:
-                            chrom[ls[0]] = info["chromosome"]
-                        break
-
-        else:  # no specific regions entries - no aliases
-            if chromosomes is None or c in chromosomes:
-                chrom[c] = c
-    gff.seek(0)
-    return chrom
 
 
 class IntervalArray:
