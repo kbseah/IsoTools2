@@ -38,6 +38,18 @@ dependencies = [
     "python-ternary",
 ]
 
+[project.scripts]
+run_isotools = "isotools.run_isotools:main"
+
+[project.optional-dependencies]
+testing = [
+    "pytest>=6.0",
+    "pytest-cov>=2.0",
+    "mypy>=0.910",
+    "flake8>=3.9",
+    "tox>=3.24",
+]
+
 [project.urls]
 Homepage = "https://github.com/HerwigLab/IsoTools2"
 Documentation = "https://isotools.readthedocs.io/"
@@ -47,6 +59,9 @@ Changelog = "https://github.com/HerwigLab/IsoTools2/blob/master/CHANGELOG.md"
 
 [tool.setuptools.dynamic]
 version = {file = ["VERSION.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 addopts = "--cov=isotools"
