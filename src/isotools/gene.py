@@ -330,7 +330,7 @@ class Gene(Interval):
                         k: v
                         for k, v in self.data["reference"].items()
                         if k not in donotshow
-                    }
+                    },
                 )
             lines[0] = (
                 self.chrom,
@@ -341,7 +341,7 @@ class Gene(Interval):
                 ".",
                 self.strand,
                 ".",
-                "; ".join(f'{k} "{v}"' for k, v in info.items()),
+                "; ".join(f'{k} "{v}"' for k, v in info.items() if k != "transcript_id"),
             )
             return lines
         return []
