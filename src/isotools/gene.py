@@ -190,12 +190,20 @@ class Gene(Interval):
 
     def _to_gtf(
         self,
-        transcript_ids,
-        ref_transcript_ids=None,
-        source="isoseq",
-        ref_source="annotation",
-    ):
-        """Creates the gtf lines of the gene as strings."""
+        transcript_ids:list,
+        ref_transcript_ids:list|None=None,
+        source:str="isoseq",
+        ref_source:str="annotation",
+    )->list[tuple]:
+        """Create the GTF lines of the gene as tuples.
+
+        :param self: isotools.Gene object
+        :param transcript_ids: List of transcript indices.
+        :param ref_transcript_ids: List of reference transcript indices.
+        :param source: Value for `source` field of GTF for transcripts.
+        :param ref_source: Value for `source` field of GTF for ref_transcripts.
+        :returns list: List of tuples, each representing a GTF line.
+        """
         donotshow = {"transcripts", "short_exons", "segment_graph"}
         info = {"gene_id": self.id, "gene_name": self.name}
         lines = [None]
@@ -219,7 +227,7 @@ class Gene(Interval):
                     for k in self.ref_transcripts[refid]:
                         if k == "exons":
                             continue
-                        elif k == "CDS":
+                        if k == "CDS":
                             if self.strand == "+":
                                 cds_start, cds_end = self.ref_transcripts[refid]["CDS"]
                             else:
@@ -228,7 +236,7 @@ class Gene(Interval):
                             refinfo.setdefault("CDS_end", []).append(str(cds_end))
                         else:
                             refinfo.setdefault(k, []).append(
-                                str(self.ref_transcripts[refid][k])
+                                str(self.ref_transcripts[refid][k]),
                             )
                 for k, vlist in refinfo.items():
                     transcript_info[f"ref_{k}"] = ",".join(vlist)
@@ -247,7 +255,7 @@ class Gene(Interval):
                     self.strand,
                     ".",
                     "; ".join(f'{k} "{v}"' for k, v in transcript_info.items()),
-                )
+                ),
             )
             noncanonical = transcript.get("noncanonical_splicing", [])
             for enr, pos in enumerate(transcript["exons"]):
@@ -268,7 +276,7 @@ class Gene(Interval):
                         self.strand,
                         ".",
                         "; ".join(f'{k} "{v}"' for k, v in exon_info.items()),
-                    )
+                    ),
                 )
         if ref_transcript_ids:
             # add reference transcripts not covered by FSM
@@ -282,7 +290,7 @@ class Gene(Interval):
                 for k in transcript:
                     if k == "exons":
                         continue
-                    elif k == "CDS":
+                    if k == "CDS":
                         if self.strand == "+":
                             cds_start, cds_end = transcript["CDS"]
                         else:
@@ -302,7 +310,7 @@ class Gene(Interval):
                             self.strand,
                             ".",
                             "; ".join(f'{k} "{v}"' for k, v in refinfo.items()),
-                        )
+                        ),
                     )
                     for enr, pos in enumerate(transcript["exons"]):
                         exon_info = info.copy()
@@ -318,7 +326,7 @@ class Gene(Interval):
                                 self.strand,
                                 ".",
                                 f'exon_id "{exon_id}"',
-                            )
+                            ),
                         )
 
         if len(lines) > 1:
@@ -341,18 +349,24 @@ class Gene(Interval):
                 ".",
                 self.strand,
                 ".",
-                "; ".join(f'{k} "{v}"' for k, v in info.items() if k != "transcript_id"),
+                "; ".join(
+                    f'{k} "{v}"' for k, v in info.items() if k != "transcript_id"
+                ),
             )
             return lines
         return []
 
-    def add_noncanonical_splicing(self, genome_fh):
+    def add_noncanonical_splicing(self, genome_fh)->None:
         """Add information on noncanonical splicing.
 
-        For all transcripts of the gene, scan for noncanonical (i.e. not GT-AG) splice sites.
-        If noncanonical splice sites are present, the corresponding intron index (in genomic orientation) and the sequence
-        i.e. the di-nucleotides of donor and acceptor as XX-YY string are stored in the "noncannoncical_splicing" field of the transcript dicts.
-        True noncanonical splicing is rare, thus it might indicate technical artifacts (template switching, misalignment, ...)
+        For all transcripts of the gene, scan for noncanonical (i.e. not GT-AG)
+        splice sites.
+        If noncanonical splice sites are present, the corresponding intron
+        index (in genomic orientation) and the sequence
+        i.e. the di-nucleotides of donor and acceptor as XX-YY string are
+        stored in the "noncannoncical_splicing" field of the transcript dicts.
+        True noncanonical splicing is rare, thus it might indicate technical
+        artifacts (template switching, misalignment, ...)
 
         :param genome_fh: A file handle of the genome fastA file."""
         ss_seq = {}
@@ -382,8 +396,10 @@ class Gene(Interval):
     def add_direct_repeat_len(self, genome_fh, delta=15, max_mm=2, wobble=2):
         """Computes direct repeat length.
 
-        This function counts the number of consecutive equal bases at donor and acceptor sites of the splice junctions.
-        This information is stored in the "direct_repeat_len" filed of the transcript dictionaries.
+        This function counts the number of consecutive equal bases at donor and
+        acceptor sites of the splice junctions.
+        This information is stored in the "direct_repeat_len" filed of the
+        transcript dictionaries.
         Direct repeats longer than expected by chance indicate template switching.
 
         :param genome_fh: The file handle to the genome fastA.
