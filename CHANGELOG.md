@@ -6,6 +6,71 @@
 * planned new feature: during import of long reads, (optionally) correct for short exon alignment issues.
 * separate new read import and classification of isoforms.
 
+## [2.2.0]
+
+* **breaking**: dropped support for Python 3.10; `requires-python` is now `>=3.11`. CI now tests 3.11-3.14 (added 3.13 and 3.14); verified the full dependency stack (numba, llvmlite, pyhmmer, CPAT, intervaltree) has published wheels for 3.14
+* removed the unused `pyproject.toml` `[project.optional-dependencies] testing` extra -- nothing installed from it (`tox.ini` uses `requirements_dev.txt` directly), and it referenced `mypy`, which isn't run anywhere in CI
+* regenerated the `requirements.txt` lock file under Python 3.14
+
+## [2.1.6]
+
+* new: `export_end_sequences` now includes strand in the fasta header (`chrom:start-end:strand`)
+* new: `write_fasta` gained an `add_coord` option to include the genomic location in the fasta header -- the transcript's genomic span for transcript sequences, or the coding sequence (annotated CDS, or predicted ORF) used for translation for protein sequences
+
+## [2.1.5]
+
+* fixed: `add_hmmer_domains` crashed with `TypeError: Function call with ambiguous argument types` since pyhmmer 0.7.0, since `get_hmmer_sequences` returned a plain list instead of a `DigitalSequenceBlock`; also crashed with `AssertionError: expression should be a string` for the documented `query=True`/`ref_query=True` default ("include all transcripts") (#53)
+
+## [2.1.4]
+
+* fixed: `alternative_splicing_events`, `altsplice_test`, and `coordination_test` crashed with `TypeError: tuple indices must be integers or slices, not numpy.bool` for real transcriptomes with numpy-typed exon coordinates (#49)
+
+## [2.1.3]
+
+* fixed: `die_test` crashed with `ValueError: The internally computed table of expected frequencies has a zero element` for genes with isoforms only covered in samples outside the two compared groups (#29)
+
+## [2.1.2]
+
+* fixed: gff3 import silently dropped genes when the file's chromosome/seqid naming didn't match the genome (e.g. RefSeq-style accessions like `NC_000001.11` vs a plain `1`/`chr1` genome FASTA); chromosome name aliasing via `region` feature lines is now resolved again, restoring behavior lost when the tabix-based reader was replaced to fix #28 (#36)
+
+## [2.1.1]
+
+* fixed: `Transcriptome[...]` gene lookup by name silently returned an arbitrary gene when the name was shared by multiple genes (common for duplicated gene symbols); now warns clearly, separately from the existing gene id ambiguity check (which itself had a bug: it checked against the combined id+name index instead of ids alone) (#27)
+
+## [2.1.0]
+
+* **breaking**: renamed `tpm` to `cpm` throughout the API (`transcript_table(cpm=..., cpm_pseudocount=...)`, `Gene.cpm()`, `estimate_cpm_threshold`, `_cpm`/`_sum_cpm` columns). The values were always counts per million (no transcript-length normalization) despite the "tpm" name -- correct for full-length long reads, where read count is already a direct proxy for molecule count, but mislabeled. No deprecated alias; update `tpm=` to `cpm=` in existing code.
+
+## [2.0.7]
+
+* fixed: `add_sample_from_csv` crashed with a confusing `AttributeError` when one transcript_id/gene_id from the coverage csv wasn't found in the transcripts file; the warning now also suggests `infer_genes=True` when the file has no gene annotations (#25)
+
+## [2.0.6]
+
+* fixed: `has_overlap`/`get_overlap` gave wrong results for reverse-strand features, where genomic coordinates are sometimes passed as `(end, start)` instead of `(start, end)`; this caused `add_domains_to_table` to silently miss overlapping domains on the reverse strand (#23)
+
+## [2.0.5]
+
+* fixed: gtf/gff3 import no longer reads the file twice for the progress bar (was pre-counting all lines); progress is now tracked by bytes read, roughly halving import time with `progress_bar=True` (#37)
+
+## [2.0.4]
+
+* fixed: `add_orf_prediction`/`add_orfs` crashed with a `KeyError` on genome FASTA files with soft-masked (lowercase) sequence; also fixes silently missed ORFs in soft-masked regions (#26)
+
+## [2.0.3]
+
+* fixed: gff3 import no longer requires a tabix index, allowing annotations on chromosomes exceeding the `.tbi` 512Mbp limit (#28)
+* new: `infer_genes` option (previously gtf-only) now also supported for gff3 import
+* docs: corrected tutorial claiming a tabix index is required for gtf/gff3 import
+
+## [2.0.2]
+
+* fixed `sashimi_plot`: replaced the removed `np.bool` alias, which crashed the `select_transcripts` option under NumPy >=1.24 (#20)
+
+## [2.0.1]
+
+* fixed `export_end_sequences`: corrected TSS/PAS coordinate calculation for minus-strand transcripts (off-by-one from half-open exon end coordinate) and added missing reverse-complement of fetched sequence
+
 ## [2.0.0]
 
 * support the analysis of Oxford Nanopore data

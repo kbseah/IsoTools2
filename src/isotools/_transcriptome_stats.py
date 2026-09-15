@@ -521,13 +521,25 @@ def alternative_splicing_events(
                     start, end = seg_graph[nX].end, seg_graph[nY].start
                     novel = (start, end) not in known.get(splice_type, set())
                 bubbles.append(
-                    [gene.id, gene.chrom, start, end, splice_type, novel]
+                    [gene.id, gene.name, gene.chrom, start, end, splice_type, novel]
+                    + [sorted(setA, key=lambda x: -gene.coverage[sidx, x].sum())]
+                    + [sorted(setB, key=lambda x: -gene.coverage[sidx, x].sum(0))]
                     + list(junction_cov)
                     + list(total_cov)
                 )
     return pd.DataFrame(
         bubbles,
-        columns=["gene", "chr", "start", "end", "splice_type", "novel"]
+        columns=[
+            "gene_id",
+            "gene_name",
+            "chr",
+            "start",
+            "end",
+            "splice_type",
+            "novel",
+            "trA",
+            "trB",
+        ]
         + [
             f"{sample}_{what}" for what in ["in_cov", "total_cov"] for sample in samples
         ],
@@ -539,21 +551,21 @@ def alternative_splicing_events(
 # function to optimize (inverse nbinom cdf)
 
 
-def _tpm_fun(tpm_th, n_reads, cov_th=2, p=0.8):
-    return (p - nbinom.cdf(n_reads - cov_th, n=cov_th, p=tpm_th * 1e-6)) ** 2
+def _cpm_fun(cpm_th, n_reads, cov_th=2, p=0.8):
+    return (p - nbinom.cdf(n_reads - cov_th, n=cov_th, p=cpm_th * 1e-6)) ** 2
 
 
-def estimate_tpm_threshold(n_reads, cov_th=2, p=0.8):
+def estimate_cpm_threshold(n_reads, cov_th=2, p=0.8):
     """Estimate the minimum expression level of observable transcripts at given coverage.
 
-    The function returns the expression level in transcripts per million (TPM), that can be observed
+    The function returns the expression level in counts per million (CPM), that can be observed
     at the given sequencing depth.
 
     :param n_reads: The sequencing depth (total number of reads) for the sample.
     :param cov_th: The requested minimum number of reads per transcripts.
     :param p: The probability of a transcript at threshold expression level to be observed.
     """
-    return minimize_scalar(_tpm_fun, bounds=(0.01, 1000), args=(n_reads, cov_th, p))[
+    return minimize_scalar(_cpm_fun, bounds=(0.01, 1000), args=(n_reads, cov_th, p))[
         "x"
     ]
 

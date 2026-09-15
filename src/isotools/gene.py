@@ -462,6 +462,8 @@ class Gene(Interval):
         ), f"Transcript id {transcript_id} not found in gene {self.id}"
         infos = classification_row[
             [
+                "structural_category",
+                "associated_transcript",
                 "dist_to_CAGE_peak",
                 "within_CAGE_peak",
                 "dist_to_polyA_site",
@@ -669,6 +671,10 @@ class Gene(Interval):
         for transcript_id, tr_seq in self.get_sequence(
             genome_fh, transcript_ids=tr_dict.keys(), reference=reference
         ).items():
+            # genome FASTA files commonly soft-mask repeats with lowercase
+            # bases; start/stop codon matching, kozak_score's PWM lookup, and
+            # the CPAT fickett/hexamer scoring all expect uppercase
+            tr_seq = tr_seq.upper()
             orfs = find_orfs(
                 tr_seq,
                 start_codons,
@@ -850,13 +856,13 @@ class Gene(Interval):
             )  # only the names of the subcategories
         elif key == "coverage":
             return self.coverage[sample_i, transcript_id]
-        elif key == "tpm":
-            return self.tpm(kwargs.get("pseudocount", 1))[sample_i, transcript_id]
+        elif key == "cpm":
+            return self.cpm(kwargs.get("pseudocount", 1))[sample_i, transcript_id]
         elif key == "group_coverage_sum":
             return tuple(self.coverage[si, transcript_id].sum() for si in group_i)
-        elif key == "group_tpm_mean":
+        elif key == "group_cpm_mean":
             return tuple(
-                self.tpm(kwargs.get("pseudocount", 1))[si, transcript_id].mean()
+                self.cpm(kwargs.get("pseudocount", 1))[si, transcript_id].mean()
                 for si in group_i
             )
         elif key in self.transcripts[transcript_id]:
@@ -887,10 +893,10 @@ class Gene(Interval):
         self.data["coverage"] = cov
         self.data["segment_graph"] = None
 
-    def tpm(self, pseudocount=1):
-        """Returns the transcripts per million (TPM).
+    def cpm(self, pseudocount=1):
+        """Returns the counts per million (CPM).
 
-        TPM is returned as a numpy array, with samples in columns and transcript isoforms in the rows.
+        CPM is returned as a numpy array, with samples in columns and transcript isoforms in the rows.
         """
         return (
             (self.coverage + pseudocount)
@@ -1316,6 +1322,14 @@ class Gene(Interval):
 
         if np.any(cov.sum(0) < min_cov):
             return np.nan, np.nan, []
+        # isoforms of the gene that are only covered in samples outside the two
+        # groups being compared have zero reads in both groups here; such an
+        # all-zero row makes chi2_contingency's expected-frequency table singular
+        # (raises ValueError "expected frequencies has a zero element") -- drop
+        # them first, keeping track of their original indices for the returned ids
+        expressed = cov.sum(1) > 0
+        orig_idx = np.flatnonzero(expressed)
+        cov = cov[expressed]
         # if there are more than 'numIsoforms' isoforms of the gene, all additional least expressed get summarized.
         if cov.shape[0] > n_isoforms:
             idx = np.argpartition(
@@ -1324,11 +1338,12 @@ class Gene(Interval):
             additional = cov[idx[n_isoforms:]].sum(0)
             cov = cov[idx[:n_isoforms]]
             cov[n_isoforms - 1] += additional
+            idx = orig_idx[idx]
             idx[n_isoforms - 1] = -1  # this isoform gets all other - I give it index
         elif cov.shape[0] < 2:
             return np.nan, np.nan, []
         else:
-            idx = np.array(range(cov.shape[0]))
+            idx = orig_idx
         try:
             _, pval, _, _ = chi2_contingency(cov)
         except ValueError:

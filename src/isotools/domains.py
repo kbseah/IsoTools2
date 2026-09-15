@@ -52,11 +52,11 @@ def add_domains_to_table(
         Multible columns can be combined to one mode with set operators "|" for union, "&" for intersection, and "-" for set difference.
         For example "trA-trB" would generate a Series with all domains of transcripts in "trA", but not in "trB".
     :param naming: Define how domains are named, either by "id" or by "name".
-    :parm overlap_only: If set "True", only domains overlapping the region from column "start" to "end" are considered.
+    :param overlap_only: If set "True", only domains overlapping the region from column "start" to "end" are considered.
         If set "False", all domains of the transcripts are considered.
     :param insert_after: Define column after which the domains are inserted into the table, either by column name or index.
         By default, domain columns returned as separate DataFrame.
-    :param **filter_kwargs: additional keywords are passed to Gene.filter_transcripts, to restrict the transcripts to be considered.
+    :param \\*\\*filter_kwargs: additional keywords are passed to Gene.filter_transcripts, to restrict the transcripts to be considered.
     """
     if modes is None:
         modes = ["trA-trB", "trB-trA"]
@@ -177,7 +177,7 @@ def get_hmmer_sequences(
     if query:
         for gene, trids, _ in transcriptome.iter_transcripts(
             genewise=True,
-            query=query,
+            query=query if isinstance(query, str) else None,
             region=region,
             min_coverage=min_coverage,
             max_coverage=max_coverage,
@@ -188,7 +188,7 @@ def get_hmmer_sequences(
     if ref_query:
         for gene, trids, _ in transcriptome.iter_ref_transcripts(
             genewise=True,
-            query=ref_query,
+            query=ref_query if isinstance(ref_query, str) else None,
             region=region,
             gois=gois,
             progress_bar=progress_bar,
@@ -214,11 +214,7 @@ def get_hmmer_sequences(
                 )
                 sequences.append(text_seq.digitize(aa_alphabet))
                 seq_ids.append(seqnames)
-    sequences_block = pyhmmer.easel.DigitalSequenceBlock(
-        alphabet=sequences[0].alphabet,
-        iterable=sequences,
-    )
-    return sequences_block, seq_ids
+    return pyhmmer.easel.DigitalSequenceBlock(aa_alphabet, sequences), seq_ids
 
 
 #  function of isoseq.Transcriptome

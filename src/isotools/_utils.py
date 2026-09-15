@@ -132,7 +132,7 @@ def basequal_hist(bam_fn, qual_bins=None, len_bins=None, n=10000):
     return pd.DataFrame(qual, index=idx, columns=col)
 
 
-def pairwise(iterable):  # e.g. usefull for enumerating introns
+def pairwise(iterable):  # e.g. useful for enumerating introns
     "s -> (s0,s1), (s1,s2), (s2, s3), ..."
     a, b = itertools.tee(iterable)
     next(b, None)
@@ -280,28 +280,27 @@ def find_orfs(sequence, start_codons=None, stop_codons=None, ref_cds=None):
 
 
 def has_overlap(r1, r2):
-    """check the overlap of two intervals
+    """Check the overlap of two intervals.
 
     Does not distinguish between (start,end) or (end,start) order in coordinates
     """
-    # Interval objects have lengths >=2, first two elements are coordinates
-    assert len(r1) >= 2, f"Should be length >=2, instead saw: {str(r1)}"
-    assert len(r2) >= 2, f"Should be length >=2, instead saw: {str(r2)}"
-    # Flip coordinates if given as (end, start)
-    r1_start, r1_end = (r1[0], r1[1]) if r1[0] < r1[1] else (r1[1], r1[0])
-    r2_start, r2_end = (r2[0], r2[1]) if r2[0] < r2[1] else (r2[1], r2[0])
-    return r1_end > r2_start and r2_end > r1_start
+    # coordinates on reverse-strand features are sometimes passed as (end, start);
+    # normalize rather than assume start < end. Only the first two elements
+    # are used -- r1/r2 may be e.g. an intervaltree.Interval with extra data
+    r1_lo, r1_hi = min(r1[0], r1[1]), max(r1[0], r1[1])
+    r2_lo, r2_hi = min(r2[0], r2[1]), max(r2[0], r2[1])
+    return r1_hi > r2_lo and r2_hi > r1_lo
 
 
 def get_overlap(r1, r2):
-    """get the overlap length of two intervals
+    """Get the overlap length of two intervals.
 
     Does not distinguish between (start,end) or (end,start) order in coordinates
     """
     # Flip coordinates if given as (end, start)
-    r1_start, r1_end = (r1[0], r1[1]) if r1[0] < r1[1] else (r1[1], r1[0])
-    r2_start, r2_end = (r2[0], r2[1]) if r2[0] < r2[1] else (r2[1], r2[0])
-    return max(0, min(r1_end, r2_end) - max(r1_start, r2_start))
+    r1_lo, r1_hi = min(r1[0], r1[1]), max(r1[0], r1[1])
+    r2_lo, r2_hi = min(r2[0], r2[1]), max(r2[0], r2[1])
+    return max(0, min(r1_hi, r2_hi) - max(r1_lo, r2_lo))
 
 
 def get_intersects(tr1, tr2):

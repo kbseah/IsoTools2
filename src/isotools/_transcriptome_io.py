@@ -5,9 +5,10 @@ import numpy as np
 import pandas as pd
 from os import path
 from intervaltree import IntervalTree, Interval
+from Bio.Seq import reverse_complement
 from collections.abc import Iterable
 from collections import Counter, defaultdict
-from pysam import TabixFile, AlignmentFile, FastaFile
+from pysam import AlignmentFile, FastaFile
 from tqdm import tqdm
 from contextlib import ExitStack
 from .short_read import Coverage
@@ -163,9 +164,10 @@ def add_sample_from_csv(
     :param sample_properties: Additional properties of the samples, that get added to the sample table, and can be used to group or stratify the samples.
         Can be provided either as a dict with sample names as keys, and the respective properties dicts as the values,
         or as a data frame with a column "name" or with the sample names in the index, and the properties in the additional columns.
+        Use "group" for grouping information.
     :param add_chromosomes: If True, genes from chromosomes which are not in the Transcriptome yet are added.
     :param infer_genes: If True, gene structure is inferred from the transcripts. Useful for gtf files without gene information.
-    :param reconstruct_genes: If True, transcript gene assignment from gtf is ignored, and transcripts are grouped to genes from scratch.
+    :param reconstruct_genes: If True, transcript to gene assignment from gtf is ignored, and transcripts are grouped to genes from scratch.
     :param min_exonic_ref_coverage: Minimal fraction of exonic overlap to assign to reference transcript if no splice junctions match.
         Also applies to mono-exonic transcripts
     :param progress_bar: Show the progress.
@@ -273,18 +275,31 @@ def add_sample_from_csv(
 
     if "gene_id" not in cov_tab:
         gene_id_dict = {tid: gid for gid, tids in transcripts.items() for tid in tids}
-        try:
-            cov_tab["gene_id"] = [gene_id_dict[tid] for tid in cov_tab.transcript_id]
-        except KeyError as e:
+        cov_tab["gene_id"] = [gene_id_dict.get(tid) for tid in cov_tab.transcript_id]
+        missing = cov_tab["gene_id"].isna()
+        if missing.any():
             logger.warning(
-                "transcript_id %s from csv file not found in gtf." % e.args[0]
+                "%d transcript_id(s) from %s not found in %s, e.g. %s",
+                missing.sum(),
+                coverage_csv_file,
+                transcripts_file,
+                cov_tab.loc[missing, "transcript_id"].iloc[0],
             )
+            cov_tab = cov_tab[~missing]
     if "chr" not in cov_tab:
         chrom_dict = {gid: chrom for chrom, gids in gene_infos.items() for gid in gids}
-        try:
-            cov_tab["chr"] = [chrom_dict[gid] for gid in cov_tab.gene_id]
-        except KeyError as e:
-            logger.warning("gene_id %s from csv file not found in gtf.", e.args[0])
+        cov_tab["chr"] = [chrom_dict.get(gid) for gid in cov_tab.gene_id]
+        missing = cov_tab["chr"].isna()
+        if missing.any():
+            logger.warning(
+                "%d gene_id(s) from %s not found in %s, e.g. %s -- if the file has no "
+                "gene annotations (only transcript/exon lines), try infer_genes=True",
+                missing.sum(),
+                coverage_csv_file,
+                transcripts_file,
+                cov_tab.loc[missing, "gene_id"].iloc[0],
+            )
+            cov_tab = cov_tab[~missing]
 
     used_transcripts = set()
     for _, row in cov_tab.iterrows():
@@ -1578,6 +1593,14 @@ def _find_matching_gene(
     return None, None, list(range((len(exons) - 1) * 2))
 
 
+def _byte_pos(fh, is_gzip):
+    "current position in the underlying (possibly compressed) file, for progress reporting"
+    # fh.tell() is disabled once a TextIOWrapper is iterated with a for-loop
+    # (its internal readahead makes the position unreliable), so read the
+    # position from the underlying binary buffer instead
+    return fh.buffer.fileobj.tell() if is_gzip else fh.buffer.tell()
+
+
 def _read_gtf_file(file_name, chromosomes, infer_genes=False, progress_bar=True):
     exons = dict()  # transcript id -> exons
     transcripts = dict()  # gene_id -> transcripts
@@ -1587,15 +1610,23 @@ def _read_gtf_file(file_name, chromosomes, infer_genes=False, progress_bar=True)
     )  # 4 tuple: info_dict, gene_start, gene_end, fixed_flag==True if start/end are fixed
     cds_start = dict()
     cds_stop = dict()
-    # with tqdm(total=path.getsize(file_name), unit_scale=True, unit='B', unit_divisor=1024, disable=not progress_bar) as pbar, TabixFile(file_name) as gtf:
-    # for line in gtf.fetch():
-    #    file_pos = gtf.tell() >> 16
-    #    if pbar.n < file_pos:
-    #       pbar.update(file_pos-pbar.n)
-    openfun = gziplib.open if file_name.endswith(".gz") else open
+    is_gz = file_name.endswith(".gz")
+    openfun = gziplib.open if is_gz else open
 
-    with openfun(file_name, "rt") as gtf:
+    with (
+        openfun(file_name, "rt") as gtf,
+        tqdm(
+            total=path.getsize(file_name),
+            unit_scale=True,
+            unit="B",
+            unit_divisor=1024,
+            disable=not progress_bar,
+        ) as pbar,
+    ):
         for line in gtf:
+            pos = _byte_pos(gtf, is_gz)
+            if pos > pbar.n:
+                pbar.update(pos - pbar.n)
             if line[0] == "#":  # ignore header lines
                 continue
             ls = line.split(sep="\t")
@@ -1741,23 +1772,25 @@ def _read_gtf_file(file_name, chromosomes, infer_genes=False, progress_bar=True)
     return exons, transcripts, gene_infos, cds_start, cds_stop, skipped
 
 
-def _get_tabix_end(tbx_fh):
-    for _line in tbx_fh.fetch(tbx_fh.contigs[-1]):
-        pass
-    end = tbx_fh.tell()
-    tbx_fh.seek(0)
-    return end
-
-
-def _read_gff_file(file_name, chromosomes, progress_bar=True):
+def _read_gff_file(file_name, chromosomes, infer_genes=False, progress_bar=True):
     exons = dict()  # transcript id -> exons
     transcripts = dict()  # gene_id -> transcripts
     skipped = defaultdict(set)
     genes = dict()
     cds_start = dict()
     cds_stop = dict()
-    # takes quite some time... add a progress bar?
+
+    is_gz = file_name.endswith(".gz")
+    openfun = gziplib.open if is_gz else open
+    # seqid -> chromosome name, learned from "region" feature lines that
+    # carry a "chromosome" attribute (common in RefSeq-style GFF3, where
+    # seqid is an accession like NC_000001.11 and "chromosome" gives the
+    # plain name, e.g. "1") -- restores the chromosome aliasing that the
+    # old TabixFile-based reader did via get_gff_chrom_dict
+    chrom_alias = {}
+
     with (
+        openfun(file_name, "rt") as gff,
         tqdm(
             total=path.getsize(file_name),
             unit_scale=True,
@@ -1765,33 +1798,55 @@ def _read_gff_file(file_name, chromosomes, progress_bar=True):
             unit_divisor=1024,
             disable=not progress_bar,
         ) as pbar,
-        TabixFile(file_name) as gff,
     ):
-        chrom_ids = get_gff_chrom_dict(gff, chromosomes)
-        for line in gff.fetch():
-            file_pos = (
-                gff.tell() >> 16
-            )  # the lower 16 bit are the position within the zipped block
-            if pbar.n < file_pos:
-                pbar.update(file_pos - pbar.n)
-            ls = line.split(sep="\t")
-            if ls[0] not in chrom_ids:
+        for line in gff:
+            pos = _byte_pos(gff, is_gz)
+            if pos > pbar.n:
+                pbar.update(pos - pbar.n)
+            if line[0] == "#":  # ignore header lines
                 continue
-            chrom = chrom_ids[ls[0]]
+
+            # unlike pysam TabixFile.fetch(), plain file iteration keeps the
+            # trailing newline, which would otherwise leak into the last
+            # (attributes) field
+            ls = line.rstrip("\n").split(sep="\t")
+            if len(ls) < 9:
+                logger.warning("GFF line has fewer than 9 fields, skipping:\n%s", line)
+                continue
+
+            raw_chrom = ls[0]
+            chrom = chrom_alias.get(raw_chrom, raw_chrom)
+            region_info = None
+            if ls[2] == "region":
+                try:
+                    region_info = dict(
+                        [pair.split("=", 1) for pair in ls[8].rstrip(";").split(";")]
+                    )
+                except ValueError:
+                    region_info = {}
+                if "chromosome" in region_info:
+                    chrom = chrom_alias[raw_chrom] = region_info["chromosome"]
+
             if chromosomes is not None and chrom not in chromosomes:
-                logger.debug("skipping line %s from chr %s", line, chrom)
+                logger.debug("skipping line from chr " + chrom)
                 continue
-            try:
-                info = dict(
-                    [pair.split("=", 1) for pair in ls[8].rstrip(";").split(";")]
-                )  # some gff lines end with ';' in gencode 36
-            except ValueError:
-                logger.warning(
-                    "GFF format error in infos (should be ; separated key=value pairs). Skipping line:\n%s",
-                    line,
-                )
+            if region_info is not None:
+                info = region_info
+            else:
+                try:
+                    info = dict(
+                        [pair.split("=", 1) for pair in ls[8].rstrip(";").split(";")]
+                    )  # some gff lines end with ';' in gencode 36
+                except ValueError:
+                    logger.warning(
+                        "GFF format error in infos (should be ; separated key=value pairs). Skipping line:\n%s",
+                        line,
+                    )
+                    continue
+
             start, end = [int(i) for i in ls[3:5]]
             start -= 1  # to make 0 based
+
             if ls[2] == "exon":
                 try:
                     gff_id = info["Parent"]
@@ -1819,6 +1874,33 @@ def _read_gff_file(file_name, chromosomes, progress_bar=True):
             ):  # those denote transcripts
                 tr_info = {k: v for k, v in info.items() if k.startswith("transcript_")}
                 transcripts.setdefault(info["Parent"], {})[info["ID"]] = tr_info
+                if infer_genes:
+                    # the transcript's Parent is the gene id -- unlike an exon's
+                    # Parent, which is the transcript id one level down
+                    gene_id = info["Parent"]
+                    if gene_id not in genes.get(chrom, {}):  # gene not seen yet
+                        gene_data = {"ID": gene_id, "chr": chrom, "strand": ls[6]}
+                        if (
+                            "gene_name" in info
+                        ):  # "Name" here is the transcript's own name
+                            gene_data["name"] = info["gene_name"]
+                        gene_data["properties"] = {
+                            k: v
+                            for k, v in info.items()
+                            if not k.startswith("transcript_")
+                        }
+                        genes.setdefault(chrom, {})[gene_id] = (
+                            gene_data,
+                            start,
+                            end,
+                        )  # start/end not fixed yet
+                    else:
+                        known_info = genes[chrom][gene_id]
+                        genes[chrom][gene_id] = (
+                            known_info[0],
+                            min(known_info[1], start),
+                            max(known_info[2], end),
+                        )
             elif ls[2] == "start_codon" and "Parent" in info:
                 cds_start[info["Parent"]] = end if ls[6] == "-" else start
             elif ls[2] == "stop_codon" and "Parent" in info:
@@ -1827,6 +1909,7 @@ def _read_gff_file(file_name, chromosomes, progress_bar=True):
                 # skip other feature types. Only keep a record of feature type without further information in skipped
                 # this usually happens to reference annotation, eg: UTR, CDS etc.
                 skipped[ls[2]]
+
     return exons, transcripts, genes, cds_start, cds_stop, skipped
 
 
@@ -1909,16 +1992,28 @@ def import_ref_transcripts(
                         if cds_start[transcript_id] < cds_stop[transcript_id]
                         else (cds_stop[transcript_id], cds_start[transcript_id])
                     )
-                gene.data["reference"].setdefault("transcripts", []).append(
-                    transcript_info
-                )
+                if (
+                    "transcripts" in gene.data["reference"]
+                    and type(gene.data["reference"]["transcripts"]) is not list
+                ):
+                    logger.warning(
+                        f"ignore gene {gene_id} as no proper annotation found"
+                    )
+                    logger.debug(
+                        f'its "transcripts" field is: {gene.data["reference"]["transcripts"]}'
+                    )
+                else:
+                    gene.data["reference"].setdefault("transcripts", []).append(
+                        transcript_info
+                    )
             if short_exon_th is not None:
-                short_exons = {
-                    exon
-                    for transcript in gene.data["reference"]["transcripts"]
-                    for exon in transcript["exons"]
-                    if exon[1] - exon[0] <= short_exon_th
-                }
+                short_exons = set()
+                for transcript in gene.data["reference"]["transcripts"]:
+                    if isinstance(transcript, dict):
+                        for exon in transcript["exons"]:
+                            exon_length = exon[1] - exon[0]
+                            if exon_length <= short_exon_th:
+                                short_exons.add(exon)
                 if short_exons:
                     gene.data["reference"]["short_exons"] = short_exons
     return genes
@@ -1948,64 +2043,98 @@ def import_sqanti_classification(self: Transcriptome, path: str, progress_bar=Tr
 def export_end_sequences(
     self: Transcriptome,
     reference: str,
-    output: str,
-    positive_query,
-    negative_query,
+    filename: str,
+    query=None,
     start=True,
     window=(25, 25),
+    unique_loc=True,
     **kwargs,
 ):
     """
-    Generates two fasta files containing the reference sequences in a window around the TSS (or PAS)
-    of all transcripts that meet and not meet the criterium respectively.
+    Generates a fasta file containing reference sequences in a window around the TSS (or PAS)
+    of all transcripts matching the given query.
 
-    :param reference: Path to the reference genome in fasta format or a FastaFile handle
-    :param output: Prefix for the two output files. Files will be generated as positive.fa and negative.fa
-    :param positive_query: Filter string that is passed to iter_transcripts() to select the positive output
-    :param negative_query: Same as positive_query, but for the negative output
-    :param start: If True, the TSS is used as reference point, otherwise the PAS
-    :param window: Tuple of bases specifying the window size around the TSS (PAS) as number of bases (upstream, downstream).
-        Total window size is upstream + downstream + 1
-    :param kwargs: Additional arguments are passed to both calls of iter_transcripts()
+    :param reference: Path to the reference genome in fasta format or a FastaFile handle.
+    :param filename: Filename or full path for the output fasta file. If not specified, a
+        default name is generated from the query and reference point (TSS/PAS).
+    :param query: Transcript tag passed to iter_transcripts() to select transcripts to export.
+        If None, all transcripts are exported.
+    :param start: If True, the TSS is used as reference point, otherwise the PAS.
+    :param window: Tuple of bases specifying the window size around the TSS (PAS) as number
+        of bases (upstream, downstream). Total window size is upstream + downstream + 1.
+    :param unique_loc: If True, only sequences from unique genomic locations are exported.
+    :param kwargs: Additional arguments are passed to iter_transcripts().
     """
+    if not query:
+        logger.info(
+            "No query specified, exporting all transcripts in the transcriptome"
+        )
+
+    if not filename:
+        filename = f"{'tss' if start else 'pas'}_sequences{'_' + str(query) if query else ''}.fa"
+
+    n_written = 0
+    n_skipped_length = 0
+    n_skipped_dup = 0
+    expected_len = sum(window) + 1
+
     with FastaFile(reference) as ref:
         known_positions = defaultdict(set)
-        with open(f"{output}_positive.fa", "w") as positive:
+
+        with open(filename, "w") as fh:
             for gene, transcript_id, transcript in self.iter_transcripts(
-                query=positive_query, **kwargs
+                query=query, **kwargs
             ):
+                is_plus = transcript["strand"] == "+"
                 center = (
                     transcript["exons"][0][0]
-                    if start == (transcript["strand"] == "+")
+                    if start == is_plus
                     else transcript["exons"][-1][1]
+                    - 1  # exclusive end -> last included base
                 )
-                window_here = window if transcript["strand"] == "+" else window[::-1]
-                pos = (gene.chrom, center - window_here[0], center + window_here[1] + 1)
-                if pos in known_positions[gene.chrom]:
+                window_here = window if is_plus else window[::-1]
+                chr, loc_start, loc_end = (
+                    gene.chrom,
+                    center - window_here[0],
+                    center + window_here[1] + 1,
+                )
+
+                if unique_loc and (chr, loc_start, loc_end) in known_positions[chr]:
+                    n_skipped_dup += 1
                     continue
-                seq = ref.fetch(*pos)
-                positive.write(
-                    f">{gene.id}\t{transcript_id}\t{pos[0]}:{pos[1]}-{pos[2]}\n{seq}\n"
-                )
-                known_positions[gene.chrom].add(pos)
-        with open(f"{output}_negative.fa", "w") as negative:
-            for gene, transcript_id, transcript in self.iter_transcripts(
-                query=negative_query, **kwargs
-            ):
-                center = (
-                    transcript["exons"][0][0]
-                    if start == (transcript["strand"] == "+")
-                    else transcript["exons"][-1][1]
-                )
-                window_here = window if transcript["strand"] == "+" else window[::-1]
-                pos = (gene.chrom, center - window_here[0], center + window_here[1] + 1)
-                if pos in known_positions[gene.chrom]:
+
+                seq = ref.fetch(chr, loc_start, loc_end)
+
+                if len(seq) != expected_len:
+                    logger.debug(
+                        "Skipping transcript %s of gene %s at %s:%d-%d: "
+                        "fetched sequence length (%d) does not match expected length (%d)",
+                        transcript_id,
+                        gene.id,
+                        chr,
+                        loc_start,
+                        loc_end,
+                        len(seq),
+                        expected_len,
+                    )
+                    n_skipped_length += 1
                     continue
-                seq = ref.fetch(*pos)
-                negative.write(
-                    f">{gene.id}\t{transcript_id}\t{pos[0]}:{pos[1]}-{pos[2]}\n{seq}\n"
+
+                if not is_plus:
+                    seq = reverse_complement(seq)
+                fh.write(
+                    f">{gene.id}\t{transcript_id}\t{chr}:{loc_start}-{loc_end}:{transcript['strand']}\n{seq}\n"
                 )
-                known_positions[gene.chrom].add(pos)
+                known_positions[chr].add((chr, loc_start, loc_end))
+                n_written += 1
+
+    logger.info(
+        "export_end_sequences: wrote %d sequences to %s (skipped %d out-of-bounds/short, %d duplicate locations)",
+        n_written,
+        filename,
+        n_skipped_length,
+        n_skipped_dup,
+    )
 
 
 def collapse_immune_genes(self: Transcriptome, maxgap=300000):
@@ -2147,12 +2276,12 @@ def aligned_part(cigartuples, is_reverse):
                 return (start, end)
             end += cigar[1]
             start = end
-    return (start, end)  # clipping at begining or no clipping
+    return (start, end)  # clipping at beginning or no clipping
 
 
 def get_clipping(cigartuples, pos):
     if cigartuples[0][0] == 4:
-        # clipping at the begining
+        # clipping at the beginning
         return (pos, -cigartuples[0][1])
     elif cigartuples[-1][0] == 4:
         # clipping at the end - get the reference position
@@ -2223,8 +2352,8 @@ def transcript_table(
     samples=None,
     groups=None,
     coverage=False,
-    tpm=False,
-    tpm_pseudocount=0,
+    cpm=False,
+    cpm_pseudocount=0,
     extra_columns=None,
     **filter_args,
 ):
@@ -2235,8 +2364,8 @@ def transcript_table(
     :param samples: provide a list of samples for which coverage / expression information is added.
     :param groups: provide groups as a dict (as from Transcriptome.groups()), for which coverage / expression information is added.
     :param coverage: If set, coverage information is added for specified samples / groups.
-    :param tpm: If set, expression information (in tpm) is added for specified samples / groups.
-    :param tpm_pseudocount: This value is added to the coverage for each transcript, before calculating tpm.
+    :param cpm: If set, expression information (in cpm) is added for specified samples / groups.
+    :param cpm_pseudocount: This value is added to the coverage for each transcript, before calculating cpm.
     :param extra_columns: Specify the additional information added to the table.
         These can be any transcript property as defined by the key in the transcript dict.
     :param filter_args: Parameters (e.g. "region", "query", "min_coverage",...) are passed to Transcriptome.iter_transcripts.
@@ -2249,7 +2378,7 @@ def transcript_table(
             samples = []
     if groups is None:
         groups = {}
-    if coverage is False and tpm is False:
+    if coverage is False and cpm is False:
         samples = []
         groups = {}
     if extra_columns is None:
@@ -2344,13 +2473,13 @@ def transcript_table(
         if samples:
             if coverage:
                 df_list.append(cov[samples].add_suffix("_coverage"))
-            if tpm:
+            if cpm:
                 total = (
                     stab.loc[samples, "nonchimeric_reads"]
-                    + tpm_pseudocount * cov.shape[0]
+                    + cpm_pseudocount * cov.shape[0]
                 )
                 df_list.append(
-                    ((cov[samples] + tpm_pseudocount) / total * 1e6).add_suffix("_tpm")
+                    ((cov[samples] + cpm_pseudocount) / total * 1e6).add_suffix("_cpm")
                 )
         if groups:
             cov_gr = pd.DataFrame(
@@ -2361,14 +2490,14 @@ def transcript_table(
             )
             if coverage:
                 df_list.append(cov_gr.add_suffix("_sum_coverage"))
-            if tpm:
+            if cpm:
                 total = {
                     group_name: stab.loc[sample, "nonchimeric_reads"].sum()
-                    + tpm_pseudocount * cov.shape[0]
+                    + cpm_pseudocount * cov.shape[0]
                     for group_name, sample in groups.items()
                 }
                 df_list.append(
-                    ((cov_gr + tpm_pseudocount) / total * 1e6).add_suffix("_sum_tpm")
+                    ((cov_gr + cpm_pseudocount) / total * 1e6).add_suffix("_sum_cpm")
                 )
         df = pd.concat(df_list, axis=1)
 
@@ -2490,6 +2619,7 @@ def write_fasta(
     reference=False,
     protein=False,
     coverage=None,
+    add_coord=False,
     **filter_args,
 ):
     """
@@ -2500,6 +2630,9 @@ def write_fasta(
     :param protein: Return protein sequences (ORF) instead of transcript sequences.
     :param coverage: By default, the coverage is not added to the header of the fasta. If set, the allowed values are: 'all', or 'sample'.
         'all' - total coverage for all samples; 'sample' - coverage by sample.
+    :param add_coord: If set, include the genomic location "chr:start-end:strand" in the header. For transcript
+        sequences, this is the transcript's genomic span; for protein sequences, this is the coding sequence
+        (annotated CDS, or predicted ORF if not annotated) used for translation.
     :param fn: The filename to write the fasta.
     :param gzip: Compress the output as gzip.
     :param filter_args: Additional filter arguments (e.g. "region", "gois", "query") are passed to iter_transcripts.
@@ -2521,15 +2654,35 @@ def write_fasta(
             tr_seqs = gene.get_sequence(
                 genome_fn, transcript_ids, reference=reference, protein=protein
             )
+            transcripts = gene.ref_transcripts if reference else gene.transcripts
             if len(tr_seqs) > 0:
-                f.write(
-                    "\n".join(
-                        f">{gene.id}_{k} gene={gene.name}"
-                        f'{(" coverage=" + (str(gene.coverage[:, k].sum()) if coverage == "all" else str(gene.coverage[:, k])) if coverage else "")}\n{v}'
-                        for k, v in tr_seqs.items()
+                lines = []
+                for k, v in tr_seqs.items():
+                    transcript = transcripts[k]
+                    coord_info = ""
+                    if add_coord:
+                        if protein:
+                            cds = transcript.get("CDS", transcript.get("ORF"))
+                            if cds:
+                                coord_info = (
+                                    f" {gene.chrom}:{cds[0]}-{cds[1]}:{gene.strand}"
+                                )
+                        else:
+                            coord_info = f" {gene.chrom}:{transcript['exons'][0][0]}-{transcript['exons'][-1][1]}:{gene.strand}"
+                    coverage_info = (
+                        " coverage="
+                        + (
+                            str(gene.coverage[:, k].sum())
+                            if coverage == "all"
+                            else str(gene.coverage[:, k])
+                        )
+                        if coverage
+                        else ""
                     )
-                    + "\n"
-                )
+                    lines.append(
+                        f">{gene.id}_{k}{coord_info} gene={gene.name}{coverage_info}\n{v}"
+                    )
+                f.write("\n".join(lines) + "\n")
 
 
 def export_alternative_splicing(
@@ -2896,30 +3049,6 @@ def _mats_alt_splice_export(
                 + [pos for exon in exons for pos in exon]
             )  # no need to reverse the order of exon start/end
     return [[offset + count] + l for count, l in enumerate(lines)]
-
-
-def get_gff_chrom_dict(gff: TabixFile, chromosomes):
-    "fetch chromosome ids - in case they use ids in gff for the chromosomes"
-    chrom = {}
-    for c in gff.contigs:
-        # loggin.debug ("---"+c)
-        for line in gff.fetch(
-            c, 1, 2
-        ):  # chromosomes span the entire chromosome, so they can be fetched like that
-            if line[1] == "C":
-                ls = line.split(sep="\t")
-                if ls[2] == "region":
-                    info = dict([pair.split("=") for pair in ls[8].split(";")])
-                    if "chromosome" in info.keys():
-                        if chromosomes is None or info["chromosome"] in chromosomes:
-                            chrom[ls[0]] = info["chromosome"]
-                        break
-
-        else:  # no specific regions entries - no aliases
-            if chromosomes is None or c in chromosomes:
-                chrom[c] = c
-    gff.seek(0)
-    return chrom
 
 
 class IntervalArray:
