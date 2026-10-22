@@ -42,5 +42,6 @@ def test_add_orfs_prefer_annotated_init_false():
             isoseq, tr, gene.chrom, fuzzy_junction=0, min_exonic_ref_coverage=0.25
         )
     with FastaFile("tests/data/zero_cds_example.fasta") as genome_fh:
-        gene.add_orfs(genome_fh, reference=False, prefer_annotated_init=False)
+        # max_5utr_len is default 0 in add_orfs but default 500 in add_orf_predictions
+        gene.add_orfs(genome_fh, reference=False, prefer_annotated_init=False, max_5utr_len=500)
     assert "ORF" in gene.transcripts[0]
