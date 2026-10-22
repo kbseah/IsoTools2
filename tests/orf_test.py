@@ -45,3 +45,21 @@ def test_add_orfs_prefer_annotated_init_false():
         # max_5utr_len is default 0 in add_orfs but default 500 in add_orf_predictions
         gene.add_orfs(genome_fh, reference=False, prefer_annotated_init=False, max_5utr_len=500)
     assert "ORF" in gene.transcripts[0]
+
+
+def test_add_orfs_prefer_annotated_init_true():
+    # add_orfs added zero-length ORFs when `prefer_annotated_init=True`
+    # because upstream AUGs (uAUGs) were also included in find_orfs output.
+    isoseq = Transcriptome.from_reference("tests/data/zero_cds_example.ref.gtf")
+    gene = isoseq["AAEL003046"]
+    with open("tests/data/zero_cds_example.annot.json", "r") as fh:
+        transcripts = json.load(fh)
+    for tr in transcripts:
+        _ = _add_sample_transcript(
+            isoseq, tr, gene.chrom, fuzzy_junction=0, min_exonic_ref_coverage=0.25
+        )
+    with FastaFile("tests/data/zero_cds_example.fasta") as genome_fh:
+        # max_5utr_len is ignored when prefer_annotated_init is true
+        gene.add_orfs(genome_fh, reference=False, prefer_annotated_init=True)
+    assert "ORF" in gene.transcripts[0]
+    assert "ORF" not in gene.transcripts[1]
