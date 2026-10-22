@@ -606,28 +606,32 @@ class Gene(Interval):
     def add_orfs(
         self,
         genome_fh,
-        tr_filter=None,
-        reference=False,
-        minlen=300,
+        tr_filter:dict|None=None,
+        reference:bool=False,
+        minlen:int=300,
         min_kozak=None,
-        max_5utr_len=0,
-        prefer_annotated_init=True,
-        start_codons=None,
-        stop_codons=None,
+        max_5utr_len:int=0,
+        prefer_annotated_init:bool=True,
+        start_codons:list[str]|None=None,
+        stop_codons:list[str]|None=None,
         kozak_matrix=DEFAULT_KOZAK_PWM,
-        get_fickett=True,
+        get_fickett:bool=True,
         coding_hexamers=None,
         noncoding_hexamers=None,
-    ):
+    )->None:
         """Predict the CDS for each transcript.
 
-        For each transcript, one ORF is selected as the coding sequence. Depending on the parameters, this is either the first ORF
-        (sequence starting with start_condon, and ending with in-frame stop codon), or the longest ORF,
-        starting with a codon that is annotated as CDS initiation site in a reference transcript.
-        The genomic and transcript positions of these codons, and the length of the ORF, as well as the number of upstream start codons
-        is added to the transcript properties transcript["ORF"]. Additionally, the Fickett score, and the hexamer score are computed. For the
-        latter, hexamer frequencies in coding and noncoding transcripts are needed. See CPAT python module for prebuilt tables and
-        instructions.
+        For each transcript, one ORF is selected as the coding sequence.
+        Depending on the parameters, this is either the first ORF (sequence
+        starting with start_codon, and ending with in-frame stop codon), or
+        the longest ORF, starting with a codon that is annotated as CDS
+        initiation site in a reference transcript.  The genomic and transcript
+        positions of these codons, and the length of the ORF, as well as the
+        number of upstream start codons is added to the transcript properties
+        transcript["ORF"]. Additionally, the Fickett score, and the hexamer
+        score are computed. For the latter, hexamer frequencies in coding and
+        noncoding transcripts are needed. See CPAT python module for prebuilt
+        tables and instructions.
 
         :param tr_filter: dict with filtering parameters passed to iter_transcripts or iter_ref_transcripts
         :param min_len: Minimum length of the ORF, Does not apply to annotated initiation sites.
@@ -659,12 +663,9 @@ class Gene(Interval):
                     i: self.transcripts[i] for i in self.filter_transcripts(**tr_filter)
                 }
         else:
-            tr_dict = {
-                i: transcript
-                for i, transcript in enumerate(
-                    self.ref_transcripts if reference else self.transcripts
-                )
-            }
+            tr_dict = dict(enumerate(
+                self.ref_transcripts if reference else self.transcripts
+            ))
         assert (
             min_kozak is None or kozak_matrix is not None
         ), "Kozak matrix missing for min_kozak"
@@ -746,8 +747,6 @@ class Gene(Interval):
                 start, stop, frame, seq_start, seq_end, uORFs, ref_transcript_ids = (
                     valid_orfs[0]
                 )
-            # if stop is None or stop - start < minlen:
-            #    continue
 
             transcript = tr_dict[transcript_id]
             transcript_start = transcript["exons"][0][0]
@@ -764,10 +763,8 @@ class Gene(Interval):
             if self.strand == "-":
                 fwd_start, fwd_stop = cum_exon_len[-1] - stop, cum_exon_len[-1] - start
             else:
-                fwd_start, fwd_stop = (
-                    start,
-                    stop,
-                )  # start/stop position wrt genomic fwd strand
+                # start/stop position wrt genomic fwd strand
+                fwd_start, fwd_stop = (start, stop)
             start_exon = next(
                 i for i in range(len(cum_exon_len)) if cum_exon_len[i] >= fwd_start
             )
@@ -821,7 +818,7 @@ class Gene(Interval):
                 "fragments"
             ] = containers  # list of (containing transcript id, first 5' exons, first 3'exons)
 
-    def coding_len(self, transcript_id):
+    def coding_len(self, transcript_id): # TODO: is this function even used?
         """Returns length of 5\'UTR, coding sequence and 3\'UTR.
 
         :param transcript_id: The transcript index for which the coding length is requested.
