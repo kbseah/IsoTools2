@@ -699,9 +699,8 @@ class Gene(Interval):
             )
             if not orfs:  # No ORF
                 continue
-            # select best ORF
-            # prefer annotated CDS init
-            anno_orfs = [orf for orf in orfs if bool(orf[6]) and orf[1] is not None]
+            # select ORFs that contain an annotated CDS init and valid stop codon
+            anno_orfs = [orf for orf in orfs if bool(orf[6]) and orf[4] is not None]
             kozak = None
             if anno_orfs:
                 start, stop, frame, seq_start, seq_end, uORFs, ref_transcript_ids = max(
@@ -711,7 +710,7 @@ class Gene(Interval):
                 valid_orfs = [
                     orf
                     for orf in orfs
-                    if orf[1] is not None
+                    if orf[4] is not None # contains a stop codon
                     and orf[1] - orf[0] > minlen
                     and orf[0] <= max_5utr_len
                 ]
