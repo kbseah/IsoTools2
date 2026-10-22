@@ -230,10 +230,11 @@ def kozak_score(sequence, pos, pwm=DEFAULT_KOZAK_PWM):
 
 def find_orfs(sequence, start_codons=None, stop_codons=None, ref_cds=None):
     """Find all open reading frames on the forward strand of the sequence.
+
     :param sequence: DNA sequence to search for ORFs.
     :param start_codons: List of start codons (default: ["ATG"]).
     :param stop_codons: List of stop codons (default: ["TAA", "TAG", "TGA"]).
-    :param ref_cds: Dictionary of reference CDS (default: {}).
+    :param ref_cds: Dictionary of reference CDS (default: None).
 
     :return: List of ORFs as tuples, containing a 7-tuple with start and stop position, reading frame (0,1 or 2), start and stop codon sequence,
     number of upstream start codons, and the ids of the reference transcripts with matching CDS initialization.
