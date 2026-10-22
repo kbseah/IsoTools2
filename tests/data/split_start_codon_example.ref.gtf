@@ -1,0 +1,17 @@
+AaegL5_1	VEuPathDB	UTR	500	619	.	+	.	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";
+AaegL5_1	VEuPathDB	exon	500	619	.	+	.	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";
+AaegL5_1	VEuPathDB	gene	500	14084	.	+	.	gene_id "AAEL010787"; gene_name "AAEL010787"; gene_type "protein_coding"; ebi_biotype "protein_coding";
+AaegL5_1	VEuPathDB	transcript	500	14084	.	+	.	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA"; gene_type "protein_coding"; transcript_type "protein_coding";
+AaegL5_1	VEuPathDB	UTR	814	1015	.	+	.	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";
+AaegL5_1	VEuPathDB	exon	814	1017	.	+	.	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";
+AaegL5_1	AGAT	start_codon	1016	1017	.	+	.	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";
+AaegL5_1	VEuPathDB	CDS	1016	1017	.	+	0	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";
+AaegL5_1	AGAT	start_codon	6877	6877	.	+	.	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";
+AaegL5_1	VEuPathDB	CDS	6877	7929	.	+	1	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";
+AaegL5_1	VEuPathDB	exon	6877	7929	.	+	.	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";
+AaegL5_1	VEuPathDB	CDS	8398	8633	.	+	1	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";
+AaegL5_1	VEuPathDB	exon	8398	8633	.	+	.	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";
+AaegL5_1	VEuPathDB	CDS	13030	13523	.	+	2	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";
+AaegL5_1	VEuPathDB	exon	13030	14084	.	+	.	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";
+AaegL5_1	AGAT	stop_codon	13521	13523	.	+	.	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";
+AaegL5_1	VEuPathDB	UTR	13524	14084	.	+	.	gene_id "AAEL010787"; gene_name "AAEL010787"; transcript_id "AAEL010787-RA";

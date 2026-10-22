@@ -1602,14 +1602,20 @@ def _byte_pos(fh, is_gzip):
 
 
 def _read_gtf_file(file_name, chromosomes, infer_genes=False, progress_bar=True):
-    exons = dict()  # transcript id -> exons
-    transcripts = dict()  # gene_id -> transcripts
+    """Read gene and transcript features from GTF file.
+
+    CDS features in the GTF file are ignored, but start_codon and stop_codon
+    features are parsed to get CDS coordinates if present.
+    """
+    
+    exons = {}  # transcript id -> exons
+    transcripts = {}  # gene_id -> transcripts
     skipped = defaultdict(set)
     gene_infos = (
         dict()
     )  # 4 tuple: info_dict, gene_start, gene_end, fixed_flag==True if start/end are fixed
-    cds_start = dict()
-    cds_stop = dict()
+    cds_start = {}
+    cds_stop = {}
     is_gz = file_name.endswith(".gz")
     openfun = gziplib.open if is_gz else open
 
@@ -1761,9 +1767,23 @@ def _read_gtf_file(file_name, chromosomes, infer_genes=False, progress_bar=True)
                         line,
                     )
             elif ls[2] == "start_codon" and "transcript_id" in info:
-                cds_start[info["transcript_id"]] = end if ls[6] == "-" else start
+                if ls[6] == "-":
+                    cds_start[info["transcript_id"]] = end
+                else:
+                    # if start codon is split across two exons, do not overwrite
+                    # previously encountered start coordinate
+                    cds_start[info["transcript_id"]] = cds_start.get(
+                        info["transcript_id"], start
+                    )
             elif ls[2] == "stop_codon" and "transcript_id" in info:
-                cds_stop[info["transcript_id"]] = start if ls[6] == "-" else end
+                if ls[6] == "-":
+                    # if stop codon is split across two exons, do not overwrite
+                    # previously encountered stop coordinate
+                    cds_stop[info["transcript_id"]] = cds_stop.get(
+                        info["transcript_id"], start
+                    )
+                else:
+                    cds_stop[info["transcript_id"]] = end
             else:
                 # skip other feature types. Only keep a record of feature type without further information in skipped
                 # this usually happens to reference annotation, eg: UTR, CDS etc.
@@ -1773,6 +1793,11 @@ def _read_gtf_file(file_name, chromosomes, infer_genes=False, progress_bar=True)
 
 
 def _read_gff_file(file_name, chromosomes, infer_genes=False, progress_bar=True):
+    """Read gene and transcript features from GFF file.
+
+    CDS features in the GFF file are ignored, but start_codon and stop_codon
+    features are parsed to get CDS coordinates if present.
+    """
     exons = dict()  # transcript id -> exons
     transcripts = dict()  # gene_id -> transcripts
     skipped = defaultdict(set)
@@ -1902,9 +1927,23 @@ def _read_gff_file(file_name, chromosomes, infer_genes=False, progress_bar=True)
                             max(known_info[2], end),
                         )
             elif ls[2] == "start_codon" and "Parent" in info:
-                cds_start[info["Parent"]] = end if ls[6] == "-" else start
+                if ls[6] == "-":
+                    cds_start[info["Parent"]] = end
+                else:
+                    # if start codon is split across two exons, do not overwrite
+                    # previously encountered start coordinate
+                    cds_start[info["Parent"]] = cds_start.get(
+                        info["Parent"], start
+                    )
             elif ls[2] == "stop_codon" and "Parent" in info:
-                cds_stop[info["Parent"]] = start if ls[6] == "-" else end
+                if ls[6] == "-":
+                    # if stop codon is split across two exons, do not overwrite
+                    # previously encountered stop coordinate
+                    cds_stop[info["Parent"]] = cds_stop.get(
+                        info["Parent"], start
+                    )
+                else:
+                    cds_stop[info["transcript_id"]] = end
             else:
                 # skip other feature types. Only keep a record of feature type without further information in skipped
                 # this usually happens to reference annotation, eg: UTR, CDS etc.
@@ -1922,8 +1961,10 @@ def import_ref_transcripts(
     short_exon_th=25,
     **kwargs,
 ):
-    """import transcripts from gff/gtf file (e.g. for a reference)
-    returns a dict interval trees for the genes"""
+    """Import transcripts from gff/gtf file (e.g. for a reference)
+
+    returns a dict interval trees for the genes
+    """
     if gene_categories is None:
         gene_categories = ["gene"]
     if file_format == "gtf":

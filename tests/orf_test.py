@@ -65,3 +65,16 @@ def test_add_orfs_prefer_annotated_init_true():
         gene.add_orfs(genome_fh, reference=False, prefer_annotated_init=True)
     assert "ORF" in gene.transcripts[0]
     assert "ORF" not in gene.transcripts[1]
+
+
+def test_import_ref_transcripts_split_start_codons():
+    # Reference transcripts where start codon features were split across two
+    # exons were imported with the wrong coordinate. Parser should treat split
+    # start codon as a single feature
+    isoseq = Transcriptome.from_reference("tests/data/split_start_codon_example.ref.gtf")
+    gene = isoseq["AAEL010787"]
+    genome_fh = "tests/data/split_start_codon_example.fasta"
+    # _seq = gene.get_sequence(genome_fh, [0], reference=True, protein=True)
+    # assert _seq is not None
+    assert gene.ref_transcripts[0]["CDS"][0] == 1015
+
