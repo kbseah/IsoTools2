@@ -606,19 +606,19 @@ class Gene(Interval):
     def add_orfs(
         self,
         genome_fh,
-        tr_filter:dict|None=None,
-        reference:bool=False,
-        minlen:int=300,
+        tr_filter: dict | None = None,
+        reference: bool = False,
+        minlen: int = 300,
         min_kozak=None,
-        max_5utr_len:int=0,
-        prefer_annotated_init:bool=True,
-        start_codons:list[str]|None=None,
-        stop_codons:list[str]|None=None,
+        max_5utr_len: int = 0,
+        prefer_annotated_init: bool = True,
+        start_codons: list[str] | None = None,
+        stop_codons: list[str] | None = None,
         kozak_matrix=DEFAULT_KOZAK_PWM,
-        get_fickett:bool=True,
+        get_fickett: bool = True,
         coding_hexamers=None,
         noncoding_hexamers=None,
-    )->None:
+    ) -> None:
         """Predict the CDS for each transcript.
 
         For each transcript, one ORF is selected as the coding sequence.
@@ -663,9 +663,9 @@ class Gene(Interval):
                     i: self.transcripts[i] for i in self.filter_transcripts(**tr_filter)
                 }
         else:
-            tr_dict = dict(enumerate(
-                self.ref_transcripts if reference else self.transcripts
-            ))
+            tr_dict = dict(
+                enumerate(self.ref_transcripts if reference else self.transcripts)
+            )
         assert (
             min_kozak is None or kozak_matrix is not None
         ), "Kozak matrix missing for min_kozak"
@@ -711,7 +711,7 @@ class Gene(Interval):
                 valid_orfs = [
                     orf
                     for orf in orfs
-                    if orf[4] is not None # contains a stop codon
+                    if orf[4] is not None  # contains a stop codon
                     and orf[1] - orf[0] > minlen
                     and orf[0] <= max_5utr_len
                 ]
@@ -818,7 +818,7 @@ class Gene(Interval):
                 "fragments"
             ] = containers  # list of (containing transcript id, first 5' exons, first 3'exons)
 
-    def coding_len(self, transcript_id): # TODO: is this function even used?
+    def coding_len(self, transcript_id):  # TODO: is this function even used?
         """Returns length of 5\'UTR, coding sequence and 3\'UTR.
 
         :param transcript_id: The transcript index for which the coding length is requested.
