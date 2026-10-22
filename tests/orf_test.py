@@ -71,7 +71,8 @@ def test_import_ref_transcripts_split_start_codons():
     # Reference transcripts where start codon features were split across two
     # exons were imported with the wrong coordinate. Parser should treat split
     # start codon as a single feature
-    isoseq = Transcriptome.from_reference("tests/data/split_start_codon_example.ref.gtf")
+    isoseq = Transcriptome.from_reference(
+        "tests/data/split_start_codon_example.ref.gtf"
+    )
     gene = isoseq["AAEL010787"]
     assert gene.ref_transcripts[0]["CDS"][0] == 1015
-

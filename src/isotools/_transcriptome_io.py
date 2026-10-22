@@ -1607,7 +1607,7 @@ def _read_gtf_file(file_name, chromosomes, infer_genes=False, progress_bar=True)
     CDS features in the GTF file are ignored, but start_codon and stop_codon
     features are parsed to get CDS coordinates if present.
     """
-    
+
     exons = {}  # transcript id -> exons
     transcripts = {}  # gene_id -> transcripts
     skipped = defaultdict(set)
@@ -1932,16 +1932,12 @@ def _read_gff_file(file_name, chromosomes, infer_genes=False, progress_bar=True)
                 else:
                     # if start codon is split across two exons, do not overwrite
                     # previously encountered start coordinate
-                    cds_start[info["Parent"]] = cds_start.get(
-                        info["Parent"], start
-                    )
+                    cds_start[info["Parent"]] = cds_start.get(info["Parent"], start)
             elif ls[2] == "stop_codon" and "Parent" in info:
                 if ls[6] == "-":
                     # if stop codon is split across two exons, do not overwrite
                     # previously encountered stop coordinate
-                    cds_stop[info["Parent"]] = cds_stop.get(
-                        info["Parent"], start
-                    )
+                    cds_stop[info["Parent"]] = cds_stop.get(info["Parent"], start)
                 else:
                     cds_stop[info["transcript_id"]] = end
             else:
