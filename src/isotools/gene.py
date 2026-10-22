@@ -190,11 +190,11 @@ class Gene(Interval):
 
     def _to_gtf(
         self,
-        transcript_ids:list,
-        ref_transcript_ids:list|None=None,
-        source:str="isoseq",
-        ref_source:str="annotation",
-    )->list[tuple]:
+        transcript_ids: list,
+        ref_transcript_ids: list | None = None,
+        source: str = "isoseq",
+        ref_source: str = "annotation",
+    ) -> list[tuple]:
         """Create the GTF lines of the gene as tuples.
 
         :param self: isotools.Gene object
@@ -356,7 +356,7 @@ class Gene(Interval):
             return lines
         return []
 
-    def add_noncanonical_splicing(self, genome_fh)->None:
+    def add_noncanonical_splicing(self, genome_fh) -> None:
         """Add information on noncanonical splicing.
 
         For all transcripts of the gene, scan for noncanonical (i.e. not GT-AG)
