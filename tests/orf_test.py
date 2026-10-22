@@ -73,8 +73,5 @@ def test_import_ref_transcripts_split_start_codons():
     # start codon as a single feature
     isoseq = Transcriptome.from_reference("tests/data/split_start_codon_example.ref.gtf")
     gene = isoseq["AAEL010787"]
-    genome_fh = "tests/data/split_start_codon_example.fasta"
-    # _seq = gene.get_sequence(genome_fh, [0], reference=True, protein=True)
-    # assert _seq is not None
     assert gene.ref_transcripts[0]["CDS"][0] == 1015
 
