@@ -695,7 +695,7 @@ class Gene(Interval):
                 tr_seq,
                 start_codons,
                 stop_codons,
-                ref_cds[transcript_id] if prefer_annotated_init else [],
+                ref_cds[transcript_id] if prefer_annotated_init else None,
             )
             if not orfs:  # No ORF
                 continue
