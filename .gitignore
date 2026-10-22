@@ -13,6 +13,7 @@
 *.bam.bai
 tests/data/example_*
 tests/data/result*
+tests/data/*.fai
 !tests/data/example*_domains*
 !tests/data/example_1_*.bam*
 
@@ -34,3 +35,6 @@ src/*.egg-info
 !/docs/notebooks/*.ipynb
 !/docs/notebooks/*.png
 /docs/_build
+
+# ctags
+tags

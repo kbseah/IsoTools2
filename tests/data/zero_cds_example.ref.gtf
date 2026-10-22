@@ -1,0 +1,18 @@
+AaegL5_1	VEuPathDB	UTR	500	698	.	+	.	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	VEuPathDB	exon	500	738	.	+	.	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	VEuPathDB	gene	500	36818	.	+	.	gene_id "AAEL003046"; gene_name "AAEL003046"; gene_type "protein_coding"; ebi_biotype "protein_coding";
+AaegL5_1	VEuPathDB	transcript	500	36818	.	+	.	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB"; gene_type "protein_coding"; transcript_type "protein_coding";
+AaegL5_1	AGAT	start_codon	699	701	.	+	.	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	VEuPathDB	CDS	699	738	.	+	0	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	VEuPathDB	CDS	22442	22544	.	+	2	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	VEuPathDB	exon	22442	22544	.	+	.	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	VEuPathDB	CDS	33305	35433	.	+	1	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	VEuPathDB	exon	33305	35433	.	+	.	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	VEuPathDB	CDS	35500	35868	.	+	2	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	VEuPathDB	exon	35500	35868	.	+	.	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	VEuPathDB	CDS	35928	36313	.	+	2	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	VEuPathDB	exon	35928	36313	.	+	.	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	VEuPathDB	CDS	36392	36439	.	+	0	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	VEuPathDB	exon	36392	36818	.	+	.	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	AGAT	stop_codon	36437	36439	.	+	.	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";
+AaegL5_1	VEuPathDB	UTR	36440	36818	.	+	.	gene_id "AAEL003046"; gene_name "AAEL003046"; transcript_id "AAEL003046-RB";

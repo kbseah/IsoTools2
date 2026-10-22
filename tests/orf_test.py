@@ -1,5 +1,7 @@
 from isotools.transcriptome import Transcriptome
+from isotools._transcriptome_io import _add_sample_transcript
 from pysam import FastaFile
+import json
 
 
 def test_add_orfs_lowercase_fasta():
@@ -24,3 +26,21 @@ def test_add_orfs_lowercase_fasta():
     assert isinstance(
         orf_info["kozak"], float
     ), "kozak score should compute without error"
+
+
+def test_add_orfs_prefer_annotated_init_false():
+    # add_orfs prefers existing annotated start codon in ref_transcripts if
+    # available. If `prefer_annotated_init=False`, find_orfs crashed with
+    # AttributeError because of wrong default. Check that orfs are indeed
+    # predicted when instructed to ignore reference
+    isoseq = Transcriptome.from_reference("tests/data/zero_cds_example.ref.gtf")
+    gene = isoseq["AAEL003046"]
+    with open("tests/data/zero_cds_example.annot.json", "r") as fh:
+        transcripts = json.load(fh)
+    for tr in transcripts:
+        _ = _add_sample_transcript(
+            isoseq, tr, gene.chrom, fuzzy_junction=0, min_exonic_ref_coverage=0.25
+        )
+    with FastaFile("tests/data/zero_cds_example.fasta") as genome_fh:
+        gene.add_orfs(genome_fh, reference=False, prefer_annotated_init=False)
+    assert all("ORF" in tr for tr in gene.transcripts)
