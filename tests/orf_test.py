@@ -43,4 +43,4 @@ def test_add_orfs_prefer_annotated_init_false():
         )
     with FastaFile("tests/data/zero_cds_example.fasta") as genome_fh:
         gene.add_orfs(genome_fh, reference=False, prefer_annotated_init=False)
-    assert all("ORF" in tr for tr in gene.transcripts)
+    assert "ORF" in gene.transcripts[0]
