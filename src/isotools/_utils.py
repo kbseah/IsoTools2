@@ -236,8 +236,13 @@ def find_orfs(sequence, start_codons=None, stop_codons=None, ref_cds=None):
     :param stop_codons: List of stop codons (default: ["TAA", "TAG", "TGA"]).
     :param ref_cds: Dictionary of reference CDS (default: None).
 
-    :return: List of ORFs as tuples, containing a 7-tuple with start and stop position, reading frame (0,1 or 2), start and stop codon sequence,
-    number of upstream start codons, and the ids of the reference transcripts with matching CDS initialization.
+    :return: List of ORFs as tuples, containing a 7-tuple with start and stop
+    position, reading frame (0,1 or 2), start and stop codon sequence, number
+    of upstream start codons, and the ids of the reference transcripts with
+    matching CDS initialization.
+
+    Start codons with no in-frame stops are still reported, in which case the
+    stop coordinates will be set to equal start and stop codon sequence to None.
     """
     if start_codons is None:
         start_codons = ["ATG"]
